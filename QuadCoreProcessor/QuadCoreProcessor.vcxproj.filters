@@ -15,8 +15,138 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="QuadCoreProcessor.cpp">
+    <ClCompile Include="cache.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="core.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="opcode.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pipline.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="bus.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="files.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mainMemory.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="main.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="cache.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="core.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="opcode.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pipline.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="bus.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="files.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="helper.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mainMemory.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="core0trace.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="core3trace.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="dsram0.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="dsram1.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="dsram2.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="dsram3.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="memout.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="regout0.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="regout1.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="regout2.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="regout3.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="stats0.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="stats1.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="stats2.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="stats3.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="tsram0.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="tsram1.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="tsram2.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="tsram3.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="bustrace.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="core1trace.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="core2trace.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="memin.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="imem1.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="imem2.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="imem0.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="imem3.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
   </ItemGroup>
 </Project>

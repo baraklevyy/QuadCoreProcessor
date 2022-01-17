@@ -139,7 +139,53 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="QuadCoreProcessor.cpp" />
+    <ClCompile Include="bus.c" />
+    <ClCompile Include="cache.c" />
+    <ClCompile Include="core.c" />
+    <ClCompile Include="files.c" />
+    <ClCompile Include="main.c" />
+    <ClCompile Include="mainMemory.c" />
+    <ClCompile Include="opcode.c" />
+    <ClCompile Include="pipline.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="bus.h" />
+    <ClInclude Include="cache.h" />
+    <ClInclude Include="core.h" />
+    <ClInclude Include="files.h" />
+    <ClInclude Include="helper.h" />
+    <ClInclude Include="mainMemory.h" />
+    <ClInclude Include="opcode.h" />
+    <ClInclude Include="pipline.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="bustrace.txt" />
+    <Text Include="core0trace.txt" />
+    <Text Include="core1trace.txt" />
+    <Text Include="core2trace.txt" />
+    <Text Include="core3trace.txt" />
+    <Text Include="dsram0.txt" />
+    <Text Include="dsram1.txt" />
+    <Text Include="dsram2.txt" />
+    <Text Include="dsram3.txt" />
+    <Text Include="imem0.txt" />
+    <Text Include="imem1.txt" />
+    <Text Include="imem2.txt" />
+    <Text Include="imem3.txt" />
+    <Text Include="memin.txt" />
+    <Text Include="memout.txt" />
+    <Text Include="regout0.txt" />
+    <Text Include="regout1.txt" />
+    <Text Include="regout2.txt" />
+    <Text Include="regout3.txt" />
+    <Text Include="stats0.txt" />
+    <Text Include="stats1.txt" />
+    <Text Include="stats2.txt" />
+    <Text Include="stats3.txt" />
+    <Text Include="tsram0.txt" />
+    <Text Include="tsram1.txt" />
+    <Text Include="tsram2.txt" />
+    <Text Include="tsram3.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
