@@ -124,7 +124,7 @@ bool Cache_WriteData(CacheData_s* cache_data, uint32_t address, uint32_t data)
 	if (tsram->fields.tag == addr.as_bits.tag && tsram->fields.mesi != cache_mesi_invalid)
 	{
 		// if the block is shared, we need to go with RdX transaction and we have a miss.
-		;		if (tsram->fields.mesi == cache_mesi_shared)
+				if (tsram->fields.mesi == cache_mesi_shared)
 		{
 			miss_occurred = true;
 			cache_data->statistics.write_misses++;

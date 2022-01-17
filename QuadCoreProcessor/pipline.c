@@ -159,8 +159,8 @@ void Pipeline_BubbleCommands(Pipeline_s* pipeline)
 		else
 		{
 			pipeline->pipe_stages[stage].pc = pipeline->pipe_stages[stage - 1].pc;
-			pipeline->pipe_stages[stage].instruction.command =
-				pipeline->pipe_stages[stage - 1].instruction.command;
+			pipeline->pipe_stages[stage].instruction.cmd =
+				pipeline->pipe_stages[stage - 1].instruction.cmd;
 			pipeline->pipe_stages[stage].operation = *pipeline->pipe_stages[stage - 1].operation;
 			pipeline->pipe_stages[stage].execute_result = pipeline->pipe_stages[stage - 1].execute_result;
 		}
@@ -194,7 +194,7 @@ static void fetch(Pipeline_s* pipeline)
 	}
 
 	pipeline->pipe_stages[FETCH].pc = *(pipeline->opcode_params.pc);
-	pipeline->pipe_stages[FETCH].instruction.command = pipeline->insturcionts_p[*(pipeline->opcode_params.pc)];
+	pipeline->pipe_stages[FETCH].instruction.cmd = pipeline->insturcionts_p[*(pipeline->opcode_params.pc)];
 	if (!pipeline->data_hazard_stall) // Not in stall
 	{
 		*(pipeline->opcode_params.pc) += 1;
@@ -284,8 +284,8 @@ Write back stage of the pipeline.
 *****************************************************************************/
 static void writeback(Pipeline_s* pipeline)
 {
-	InstructionFormat_s instuction = { .command = pipeline->pipe_stages[WRITE_BACK].instruction.command };
-	int index = instuction.bits.opcode == JAL ? PROGRAM_COUNTER_REGISTER_NUM : instuction.bits.rd;
+	inst instuction = { .cmd = pipeline->pipe_stages[WRITE_BACK].instruction.cmd };
+	int index = instuction.bits.opcode == JAL ? NEXT_INSTRUCTION_ADDRESS_REGISTER : instuction.bits.rd;
 	pipeline->core_registers_p[index] = pipeline->pipe_stages[WRITE_BACK].execute_result;
 }
 
@@ -301,8 +301,8 @@ Preparing the parans struct for the operations functions.
 *****************************************************************************/
 static void prepare_registers_params(Pipeline_s* pipeline, PipelineSM_e stage)
 {
-	InstructionFormat_s instuction = { .command = pipeline->pipe_stages[stage].instruction.command };
-	pipeline->core_registers_p[IMMEDIATE_REGISTER_INDEX] = instuction.bits.immediate;
+	inst instuction = { .cmd = pipeline->pipe_stages[stage].instruction.cmd };
+	pipeline->core_registers_p[REG_IMM] = instuction.bits.immediate;
 	pipeline->pipe_stages[stage].execute_result = pipeline->core_registers_p[instuction.bits.rd];
 
 	pipeline->opcode_params.rs = pipeline->core_registers_p[instuction.bits.rs];
@@ -348,10 +348,10 @@ Comparing between the registers of certain stage and the rd register.
 static bool compare_register(Pipeline_s* pipeline, uint16_t reg, uint16_t stage)
 {
 	bool ret = false;
-	InstructionFormat_s decode_ins = pipeline->pipe_stages[DECODE].instruction;
+	inst decode_ins = pipeline->pipe_stages[DECODE].instruction;
 	uint16_t op = pipeline->pipe_stages[WRITE_BACK].instruction.bits.opcode;
 
-	if (reg == IMMEDIATE_REGISTER_INDEX || reg == ZERO_REGISTER_INDEX)
+	if (reg == REG_IMM || reg == REG_ZERO)
 	{
 		ret = false;
 	}

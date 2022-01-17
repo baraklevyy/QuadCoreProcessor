@@ -127,7 +127,7 @@ void Core_Teaddown(Core_s* core)
 {
 	print_register_file(core);
 	Cache_PrintData(&core->pipeline.cache_data,
-		core->core_files.DsRamFile, core->core_files.TsRamFile);
+		core->core_files.dsram_F, core->core_files.TsRamFile);
 	print_statistics(core);
 }
 
@@ -161,7 +161,7 @@ Init the core instructions memory.
 static int init_memory(Core_s* core)
 {
 	int number_of_lines = 0;
-	while (number_of_lines < INSTRUCTIONS_MEMORY_SIZE && fscanf(core->core_files.InstructionMemFile,
+	while (number_of_lines < INSTRUCTIONS_MEMORY_SIZE && fscanf(core->core_files.imem_F,
 		"%08x", (uint32_t*)&(core->instructions_memory_image[number_of_lines])) != EOF)
 	{
 		number_of_lines++;
@@ -181,10 +181,10 @@ Writing the trace of the core.
 *****************************************************************************/
 static void write_trace(Core_s* core, uint32_t* regs_copy)
 {
-	fprintf(core->core_files.TraceFile, "%d ", core->statistics.cycles);
-	Pipeline_WriteToTrace(&core->pipeline, core->core_files.TraceFile);
+	fprintf(core->core_files.core_trace_F, "%d ", core->statistics.cycles);
+	Pipeline_WriteToTrace(&core->pipeline, core->core_files.core_trace_F);
 	write_regs_to_file(core, regs_copy);
-	fprintf(core->core_files.TraceFile, "\n");
+	fprintf(core->core_files.core_trace_F, "\n");
 
 }
 
@@ -199,9 +199,10 @@ Writing the registers to file.
 *****************************************************************************/
 static void write_regs_to_file(Core_s* core, uint32_t* regs_copy)
 {
-	for (int i = START_MUTABLE_REGISTER_INDEX; i < NUMBER_OF_REGISTERS; i++) // We are not writing register 0 and 1.
+	//first two registers are not for write
+	for (int i = 2; i < NUMBER_OF_REGISTERS; i++)
 	{
-		fprintf(core->core_files.TraceFile, "%08X ", regs_copy[i]);
+		fprintf(core->core_files.core_trace_F, "%08X ", regs_copy[i]);
 	}
 }
 
@@ -231,9 +232,10 @@ Printing the registers file.
 *****************************************************************************/
 static void print_register_file(Core_s* core)
 {
-	for (int i = START_MUTABLE_REGISTER_INDEX; i < NUMBER_OF_REGISTERS; i++)
+	//first two registers arent for printing
+	for (int i = 2; i < NUMBER_OF_REGISTERS; i++)
 	{
-		fprintf(core->core_files.RegFile, "%08X\n", core->register_array[i]);
+		fprintf(core->core_files.regout_F, "%08X\n", core->register_array[i]);
 	}
 }
 

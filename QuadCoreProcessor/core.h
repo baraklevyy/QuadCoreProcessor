@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include "pipline.h"
 #include "helper.h"
-#include "files.h"
+
 
 
 #define INSTRUCTIONS_MEMORY_SIZE 1024
@@ -22,7 +22,7 @@ typedef struct
 	uint16_t program_counter;	// pc is 10bit
 	uint32_t register_array[NUMBER_OF_REGISTERS];
 	uint32_t instructions_memory_image[INSTRUCTIONS_MEMORY_SIZE];
-	Core_Files core_files;
+	output_core_file core_files;
 	Pipeline_s pipeline;
 	Statistics_s statistics;
 }Core_s;

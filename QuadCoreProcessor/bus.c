@@ -16,7 +16,6 @@ ALL RIGHTS RESERVED
 ************************************/
 #include "bus.h"
 #include "helper.h"
-#include "files.h"
 //
 #include <string.h>
 #include <stdlib.h>
@@ -59,7 +58,7 @@ typedef struct _queue_item_s
 /************************************
 *      variables                    *
 ************************************/
-static Bus_cache_interface_s gCacheInterface[NUMBER_OF_CORES];
+static Bus_cache_interface_s gCacheInterface[CORES_NUMBER];
 //
 // Callbacks
 static shared_signal_callback	gSharedSignalCallback;
@@ -69,7 +68,7 @@ static memory_callback_t		gMemoryCallback;
 //
 // global variables
 static bool gBusInProgress;
-static transaction_state_e gBusTransactionState[NUMBER_OF_CORES] = { 0, 0, 0, 0 };
+static transaction_state_e gBusTransactionState[CORES_NUMBER] = { 0, 0, 0, 0 };
 static Bus_packet_s gCurrentPacket;
 static uint8_t gAddressOffset;
 static uint32_t gIterCounter = 0;
@@ -206,7 +205,7 @@ static bool check_shared_line(Bus_packet_s* packet, bool* is_modified)
 {
 	bool shared = false;
 
-	for (int i = 0; i < NUMBER_OF_CORES; i++)
+	for (int i = 0; i < CORES_NUMBER; i++)
 		shared |= gSharedSignalCallback(gCacheInterface[i].cache_data, packet, is_modified);
 
 	return shared;
@@ -215,7 +214,7 @@ static bool check_shared_line(Bus_packet_s* packet, bool* is_modified)
 static bool check_cache_snooping(Bus_packet_s* packet)
 {
 	bool cache_response = false;
-	for (int i = 0; i < NUMBER_OF_CORES; i++)
+	for (int i = 0; i < CORES_NUMBER; i++)
 		cache_response |= gCacheSnoopingCallback(gCacheInterface[i].cache_data, packet, gAddressOffset);
 
 	return cache_response;

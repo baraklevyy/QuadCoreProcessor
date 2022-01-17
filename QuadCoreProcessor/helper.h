@@ -13,22 +13,16 @@ ALL RIGHTS RESERVED
 
 #ifndef __HELPERS_H__
 #define __HELPERS_H__
-
-/************************************
-*      include                      *
-************************************/
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+	
 
-/************************************
-*      definitions                 *
-************************************/
-#define NUMBER_OF_CORES 4
 #define NUMBER_OF_REGISTERS 16
-#define IMMEDIATE_REGISTER_INDEX 1
-#define ZERO_REGISTER_INDEX 0
-#define START_MUTABLE_REGISTER_INDEX 2
-#define PROGRAM_COUNTER_REGISTER_NUM 15
+#define REG_ZERO 0
+#define REG_IMM 1
+#define NEXT_INSTRUCTION_ADDRESS_REGISTER 15
+#define CORES_NUMBER 4
 
 /************************************
 *       types                       *
@@ -37,14 +31,34 @@ typedef union
 {
 	struct
 	{
-		uint16_t immediate : 12;	// [0:11]  Immediate value
-		uint16_t rt : 4;			// [12:15] src1 value
-		uint16_t rs : 4;			// [16:19] src0 value
-		uint16_t rd : 4;			// [20:23] src0 value
-		uint16_t opcode : 8;		// [24:31] opcode value
+		uint16_t immediate : 12;
+		uint16_t rt : 4;		
+		uint16_t rs : 4;		
+		uint16_t rd : 4;		
+		uint16_t opcode : 8;	
 	} bits;
 
-	uint32_t command;
-} InstructionFormat_s;
+	uint32_t cmd;
+} inst;
+
+
+/*File declarations*/
+typedef struct
+	{
+		FILE* imem_F;
+		FILE* regout_F;
+		FILE* core_trace_F;
+		FILE* dsram_F;
+		FILE* TsRamFile;
+		FILE* StatsFile;
+	} output_core_file;
+
+extern output_core_file files_of_cores[CORES_NUMBER];
+FILE* MeminFile;
+FILE* MemoutFile;
+FILE* BusTraceFile;
+
+
+
 
 #endif //__FILE_NAME_H__

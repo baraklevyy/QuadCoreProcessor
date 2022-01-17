@@ -24,7 +24,7 @@ typedef struct
 {
 	PipelineSM_e state;
 	uint16_t pc;
-	InstructionFormat_s instruction;
+	inst instruction;
 	uint32_t execute_result;
 	void (*operation)(Opcode_fucntion_params_s* params);
 } PipelineStage_s;

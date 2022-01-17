@@ -142,7 +142,6 @@
     <ClCompile Include="bus.c" />
     <ClCompile Include="cache.c" />
     <ClCompile Include="core.c" />
-    <ClCompile Include="files.c" />
     <ClCompile Include="main.c" />
     <ClCompile Include="mainMemory.c" />
     <ClCompile Include="opcode.c" />
@@ -152,7 +151,6 @@
     <ClInclude Include="bus.h" />
     <ClInclude Include="cache.h" />
     <ClInclude Include="core.h" />
-    <ClInclude Include="files.h" />
     <ClInclude Include="helper.h" />
     <ClInclude Include="mainMemory.h" />
     <ClInclude Include="opcode.h" />
