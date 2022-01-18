@@ -16,8 +16,9 @@ ALL RIGHTS RESERVED
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-	
 
+#define MAIN_MEMORY_SIZE 1048576 
+#define BAD_EXIT_CODE 1
 #define NUMBER_OF_REGISTERS 16
 #define REG_ZERO 0
 #define REG_IMM 1
@@ -42,6 +43,14 @@ typedef union
 } inst;
 
 
+typedef struct
+{
+	uint32_t address;
+	uint16_t offset;
+	uint16_t block;
+} memory_addess_s;
+
+
 /*File declarations*/
 typedef struct
 	{
@@ -58,7 +67,18 @@ FILE* MeminFile;
 FILE* MemoutFile;
 FILE* BusTraceFile;
 
+enum core_E{core0, core1, core2, core3};
+enum file_names_E{ imem0 = 1, imem1 , imem2, imem3,
+	memin, memout,
+	regout0, regout1, regout2, regout3,
+	core0trace, core1trace, core2trace, core3trace, bustrace,
+	dsram0, dsram1, dsram2, dsram3,
+	tsram0, tsram1, tsram2, tsram3,
+	stats0, stats1, stats2, stats3};
 
+uint16_t get_address_offset(uint32_t address);
+uint16_t get_address_block(uint32_t address);
+void set_offset_to_address(uint32_t* address, uint8_t offset);
 
 
 #endif //__FILE_NAME_H__

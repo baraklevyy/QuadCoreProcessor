@@ -7,7 +7,7 @@
 
 
 
-#define INSTRUCTIONS_MEMORY_SIZE 1024
+#define SIZE_OF_INST 1024
 
 typedef struct
 {
@@ -21,7 +21,7 @@ typedef struct
 	uint8_t index;
 	uint16_t program_counter;	// pc is 10bit
 	uint32_t register_array[NUMBER_OF_REGISTERS];
-	uint32_t instructions_memory_image[INSTRUCTIONS_MEMORY_SIZE];
+	uint32_t instructions_memory_image[SIZE_OF_INST];
 	output_core_file core_files;
 	Pipeline_s pipeline;
 	Statistics_s statistics;

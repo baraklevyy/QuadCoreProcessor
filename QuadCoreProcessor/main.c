@@ -11,10 +11,10 @@ output_core_file files_of_cores[CORES_NUMBER];
 
 static void AssignFiles(Core_s* cores);
 static void CoresInit();
-int open_files(char* argv[], int argc);
+int open_files(char* argv[], int number_of_arguments);
 void close_all_files();
-
-
+enum core_E core_number;
+enum file_names_E;
 
 
 int main(int argc, char* argv[])
@@ -22,7 +22,7 @@ int main(int argc, char* argv[])
 	if (!open_files(argv, argc))
 	{
 		printf("Cannot open files.\n");
-		return 1;
+		return BAD_EXIT_CODE;
 	}
 
 	MainMemory_Init();
@@ -82,11 +82,88 @@ void close_all_files() {
 	fclose(BusTraceFile);
 }
 
-int open_files(char* argv[], int argc)
+int open_files(char* argv[], int number_of_arguments)
 {
-	bool is_default_parameters = false;
-	if (1 == argc) is_default_parameters = true;
+	if (!(1 == number_of_arguments)) {// arguments are passed
+		MeminFile = fopen(argv[memin], "r");
+		MemoutFile = fopen(argv[memout], "w");
+		BusTraceFile =fopen(argv[bustrace], "w");
 
+		files_of_cores[core0].imem_F =fopen(argv[imem0], "r");
+		files_of_cores[core0].regout_F =fopen(argv[regout0], "w");
+		files_of_cores[core0].core_trace_F =fopen(core0trace, "w");
+		files_of_cores[core0].dsram_F =fopen(dsram0, "w");
+		files_of_cores[core0].TsRamFile =fopen(tsram0, "w");
+		files_of_cores[core0].StatsFile =fopen(stats0, "w");
+
+		files_of_cores[core1].imem_F = fopen(imem1, "r");
+		files_of_cores[core1].regout_F =fopen(regout1, "w");
+		files_of_cores[core1].core_trace_F =fopen(core1trace, "w");
+		files_of_cores[core1].dsram_F =fopen(dsram1, "w");
+		files_of_cores[core1].TsRamFile =fopen(tsram1, "w");
+		files_of_cores[core1].StatsFile =fopen(stats1, "w");
+
+		files_of_cores[core2].imem_F =fopen(imem2, "r");
+		files_of_cores[core2].regout_F = fopen(regout2, "w");
+		files_of_cores[core2].core_trace_F =fopen(core2trace, "w");
+		files_of_cores[core2].dsram_F =fopen(dsram2, "w");
+		files_of_cores[core2].TsRamFile =fopen(tsram2, "w");
+		files_of_cores[core2].StatsFile = fopen(stats2, "w");
+
+		files_of_cores[core3].imem_F =fopen(imem3, "r");
+		files_of_cores[core3].regout_F =fopen(regout3, "w");
+		files_of_cores[core3].core_trace_F =fopen(core3trace, "w");
+		files_of_cores[core3].dsram_F =fopen(dsram3, "w");
+		files_of_cores[core3].TsRamFile =fopen(tsram3, "w");
+		files_of_cores[core3].StatsFile =fopen(stats3, "w");
+	}
+	else { //default arguments
+		MeminFile = fopen("memin.txt", "r");
+		MemoutFile = fopen("memout.txt", "w");
+		BusTraceFile = fopen("bustrace.txt", "w");
+
+		files_of_cores[core0].imem_F = fopen("imem0.txt", "r");
+		files_of_cores[core0].regout_F = fopen("regout0.txt", "w");
+		files_of_cores[core0].core_trace_F = fopen("core0trace.txt", "w");
+		files_of_cores[core0].dsram_F = fopen("dsram0.txt", "w");
+		files_of_cores[core0].TsRamFile = fopen("tsram0.txt", "w");
+		files_of_cores[core0].StatsFile = fopen("stats0.txt", "w");
+
+		files_of_cores[core1].imem_F = fopen("imem1.txt", "r");
+		files_of_cores[core1].regout_F = fopen("regout1.txt", "w");
+		files_of_cores[core1].core_trace_F = fopen("core1trace.txt", "w");
+		files_of_cores[core1].dsram_F = fopen("dsram1.txt", "w");
+		files_of_cores[core1].TsRamFile = fopen("tsram1.txt", "w");
+		files_of_cores[core1].StatsFile = fopen("stats1.txt", "w");
+
+		files_of_cores[core2].imem_F = fopen("imem2.txt", "r");
+		files_of_cores[core2].regout_F = fopen("regout2.txt", "w");
+		files_of_cores[core2].core_trace_F = fopen("core2trace.txt", "w");
+		files_of_cores[core2].dsram_F = fopen("dsram2.txt", "w");
+		files_of_cores[core2].TsRamFile = fopen("tsram2.txt", "w");
+		files_of_cores[core2].StatsFile = fopen("stats2.txt", "w");
+
+		files_of_cores[core3].imem_F = fopen("imem3.txt", "r");
+		files_of_cores[core3].regout_F = fopen("regout3.txt", "w");
+		files_of_cores[core3].core_trace_F = fopen("core3trace.txt", "w");
+		files_of_cores[core3].dsram_F = fopen("dsram3.txt", "w");
+		files_of_cores[core3].TsRamFile = fopen("tsram3.txt", "w");
+		files_of_cores[core3].StatsFile = fopen("stats3.txt", "w");
+
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+/*
 
 	MeminFile = is_default_parameters ? fopen("memin.txt", "r") : fopen(argv[5], "r");
 	MemoutFile = is_default_parameters ? fopen("memout.txt", "w") : fopen(argv[6], "w");
@@ -119,7 +196,9 @@ int open_files(char* argv[], int argc)
 	files_of_cores[3].dsram_F = is_default_parameters ? fopen("dsram3.txt", "w") : fopen(argv[19], "w");
 	files_of_cores[3].TsRamFile = is_default_parameters ? fopen("tsram3.txt", "w") : fopen(argv[23], "w");
 	files_of_cores[3].StatsFile = is_default_parameters ? fopen("stats3.txt", "w") : fopen(argv[27], "w");
+	
 	//check all the core files for error in opening
+	*/
 	for (int i = 0; i < CORES_NUMBER; i++)
 	{
 		if (NULL == files_of_cores[i].core_trace_F || NULL == files_of_cores[i].dsram_F || NULL == files_of_cores[i].imem_F || NULL == files_of_cores[i].regout_F || NULL == files_of_cores[i].StatsFile || NULL == files_of_cores[i].TsRamFile)

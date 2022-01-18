@@ -142,6 +142,7 @@
     <ClCompile Include="bus.c" />
     <ClCompile Include="cache.c" />
     <ClCompile Include="core.c" />
+    <ClCompile Include="helper.c" />
     <ClCompile Include="main.c" />
     <ClCompile Include="mainMemory.c" />
     <ClCompile Include="opcode.c" />

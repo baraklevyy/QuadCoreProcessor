@@ -23,6 +23,7 @@ ALL RIGHTS RESERVED
 /************************************
 *       types                       *
 ************************************/
+/*
 typedef union
 {
 	uint32_t address;
@@ -33,6 +34,13 @@ typedef union
 		uint32_t block : 18;	// [2:19]
 	} fields;
 } memory_addess_s;
+*/
+/*
+typedef struct
+{
+	uint32_t address;
+} memory_addess_s;
+*/
 
 /************************************
 *      variables                    *
@@ -47,21 +55,10 @@ static bool gMemoryTransaction;
 static bool bus_transaction_handler(Bus_packet_s* packet, bool direct_transaction);
 static uint32_t get_memory_length(void);
 
-/************************************
-*       API implementation          *
-************************************/
 
-/*!
-******************************************************************************
-\brief
-Initialize main memory from input file.
-\details
-Must be called only once
-\return none
-*****************************************************************************/
 void MainMemory_Init(void)
 {
-	memset((uint8_t*)gMemory, 0, sizeof(gMemory));
+	//memset((uint8_t*)gMemory, 0, sizeof(gMemory));
 	counter = 0;
 	gMemoryTransaction = false;
 

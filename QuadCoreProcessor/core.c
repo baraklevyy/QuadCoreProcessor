@@ -161,7 +161,7 @@ Init the core instructions memory.
 static int init_memory(Core_s* core)
 {
 	int number_of_lines = 0;
-	while (number_of_lines < INSTRUCTIONS_MEMORY_SIZE && fscanf(core->core_files.imem_F,
+	while (number_of_lines < SIZE_OF_INST && fscanf(core->core_files.imem_F,
 		"%08x", (uint32_t*)&(core->instructions_memory_image[number_of_lines])) != EOF)
 	{
 		number_of_lines++;

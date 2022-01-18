@@ -28,16 +28,6 @@ ALL RIGHTS RESERVED
 /************************************
 *       types                       *
 ************************************/
-typedef union
-{
-	uint32_t address;
-
-	struct
-	{
-		uint16_t offset : 2;	// [0:1]
-		uint32_t block : 18;	// [2:19]
-	} fields;
-} memory_addess_s;
 
 typedef enum
 {
@@ -166,9 +156,10 @@ void Bus_Iter(void)
 
 	Bus_packet_s packet;
 	memcpy(&packet, &gCurrentPacket, sizeof(gCurrentPacket));
-
-	memory_addess_s address = { .address = gCurrentPacket.bus_addr };
-	address.fields.offset = gAddressOffset;
+	memory_addess_s address;
+	address.address = gCurrentPacket.bus_addr;
+	//address.offset = gAddressOffset;
+	set_offset_to_address(&address, gAddressOffset);
 	packet.bus_addr = address.address;
 
 	bool is_modified = false;
