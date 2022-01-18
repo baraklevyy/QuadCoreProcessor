@@ -16,15 +16,16 @@ typedef enum
 	cache_core2,
 	cache_core3,
 } Cache_Id_e;
-
+/*
 typedef enum
 {
-	cache_mesi_invalid,
+	invalid,
 	cache_mesi_shared,
 	cache_mesi_exclusive,
 	cache_mesi_modified,
 
 } Cache_mesi_e;
+*/
 /*
 typedef union
 {

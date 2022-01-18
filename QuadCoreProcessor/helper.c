@@ -68,3 +68,60 @@ void set_mesi_state_to_tsram(uint32_t* tsram, uint16_t mesi_state) {
 	mask = (mask << 12);
 	*tsram = (*tsram) | mask;
 }
+
+
+/*
+typedef union
+{
+	uint32_t address;
+
+	struct
+	{
+		uint32_t offset : 2;	// [0:1]
+		uint32_t index : 6;	// [2:7]
+		uint32_t tag : 12;	// [8:19]
+	} as_bits;
+} cache_addess_s;
+*/
+
+
+uint32_t get_cache_address_offset(uint32_t cache) {
+	uint32_t mask = 0x00000003;
+	uint32_t offset = cache & mask;
+	return offset;
+}
+
+uint32_t get_cache_address_index(uint32_t cache) {
+	uint32_t mask = 0x000000fc; // setting ones just in the index location [2:7]
+	uint32_t index = cache & mask;
+	index = (index >> 2); //need to shift the bits back to the lsb in order to isolate the index
+	return index;
+}
+
+uint32_t get_cache_address_tag(uint32_t cache) {
+	uint32_t mask = 0x000fff00; // setting ones just in the tag location [8:19]
+	uint32_t tag = cache & mask;
+	tag = (tag >> 8); //need to shift the bits back to the lsb in order to isolate the index
+	return tag;
+}
+void set_offset_to_cache_address(uint32_t* cache, uint32_t offset) {
+	*cache = (*cache) & (0xfffffffc); //make 2 LSB into 0 and keep the rest the same;
+	uint32_t mask = 0x00000003; // this mask is 2LSB as 0
+	mask = mask & offset; //take the 2 LSB of offset
+	*cache = (*cache) | mask;
+}
+
+void set_index_to_cache_address(uint32_t* cache, uint32_t index) {
+	*cache = (*cache) & (0xffffff03); //make bit [2:7] into 0 and all the rest to 1
+	uint32_t mask = 0x0000003f; // this mask is 6LSB of index
+	mask = mask & index; //take the 2 LSB of offset
+	mask = (mask << 2);
+	*cache = (*cache) | mask;
+}
+void set_tag_to_cache_address(uint32_t* cache, uint32_t tag) {
+	*cache = (*cache) & (0xfff000ff); //make bit [8:19] into 0 and all the rest to 1
+	uint32_t mask = 0x00000fff; // this mask is 12LSB of tag
+	mask = mask & tag; //take the 2 LSB of offset
+	mask = (mask << 8);
+	*cache = (*cache) | mask;
+}

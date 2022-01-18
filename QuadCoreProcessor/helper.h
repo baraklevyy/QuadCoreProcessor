@@ -75,6 +75,18 @@ typedef struct
 		FILE* StatsFile;
 	} output_core_file;
 
+
+
+
+
+
+
+
+
+
+
+
+
 extern output_core_file files_of_cores[CORES_NUMBER];
 FILE* MeminFile;
 FILE* MemoutFile;
@@ -89,6 +101,9 @@ enum file_names_E{ imem0 = 1, imem1 , imem2, imem3,
 	tsram0, tsram1, tsram2, tsram3,
 	stats0, stats1, stats2, stats3};
 
+typedef enum{invalid, shared, exclusive, modified} mesi_state;
+
+
 uint16_t get_address_offset(uint32_t address);
 uint16_t get_address_block(uint32_t address);
 void set_offset_to_address(uint32_t* address, uint8_t offset);
@@ -96,6 +111,12 @@ uint16_t get_tsram_tag(uint32_t tsram);
 uint16_t get_tsram_mesi_state(uint32_t tsram);
 void set_tag_to_tsram(uint32_t* tsram, uint16_t tag);
 void set_mesi_state_to_tsram(uint32_t* tsram, uint16_t mesi_state);
+uint32_t get_cache_address_offset(uint32_t cache);
+uint32_t get_cache_address_index(uint32_t cache);
+uint32_t get_cache_address_tag(uint32_t cache);
+void set_offset_to_cache_address(uint32_t* cache, uint32_t offset);
+void set_index_to_cache_address(uint32_t* cache, uint32_t index);
+void set_tag_to_cache_address(uint32_t* cache, uint32_t tag);
 
 
 #endif //__FILE_NAME_H__
