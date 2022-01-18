@@ -19,6 +19,11 @@ enum file_names_E;
 
 int main(int argc, char* argv[])
 {
+	/*
+	uint16_t res;
+	uint32_t test = 0xffff3fff;
+	res = get_tsram_mesi_state(test);
+	*/
 	if (!open_files(argv, argc))
 	{
 		printf("Cannot open files.\n");

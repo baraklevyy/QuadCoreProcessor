@@ -1,6 +1,7 @@
 #include "cache.h"
 #include <string.h>
 #include "bus.h"
+#include "helper.h"
 
 typedef union
 {
@@ -74,10 +75,12 @@ bool Cache_ReadData(CacheData_s* cache_data, uint32_t address, uint32_t* data)
 
 	cache_addess_s addr;
 	addr.address = address;
-	Tsram_s* tsram = &(cache_data->tsram[addr.as_bits.index]);
+	//Tsram_s* tsram = &(cache_data->tsram[addr.as_bits.index]);
+	uint32_t* tsram = &(cache_data->tsram[addr.as_bits.index]);
 
 	// check if addresss tag is locate on block_number
-	if (tsram->fields.tag == addr.as_bits.tag && tsram->fields.mesi != cache_mesi_invalid)
+	//if (tsram->fields.tag == addr.as_bits.tag && tsram->fields.mesi != cache_mesi_invalid)
+	if (get_tsram_tag(*tsram) == addr.as_bits.tag && get_tsram_mesi_state(*tsram) != cache_mesi_invalid)
 	{
 		// hit on cache, getting the value 
 		uint16_t index = addr.as_bits.index * BLOCK_SIZE + addr.as_bits.offset;
@@ -118,13 +121,16 @@ bool Cache_WriteData(CacheData_s* cache_data, uint32_t address, uint32_t data)
 
 	cache_addess_s addr;
 	addr.address = address;
-	Tsram_s* tsram = &(cache_data->tsram[addr.as_bits.index]);
+	//Tsram_s* tsram = &(cache_data->tsram[addr.as_bits.index]);
+	uint32_t* tsram = &(cache_data->tsram[addr.as_bits.index]);
 
 	// check if addresss tag is locate on block_number
-	if (tsram->fields.tag == addr.as_bits.tag && tsram->fields.mesi != cache_mesi_invalid)
+	//if (tsram->fields.tag == addr.as_bits.tag && tsram->fields.mesi != cache_mesi_invalid)
+	if (get_tsram_tag(*tsram) == addr.as_bits.tag && get_tsram_mesi_state(*tsram) != cache_mesi_invalid)
 	{
 		// if the block is shared, we need to go with RdX transaction and we have a miss.
-				if (tsram->fields.mesi == cache_mesi_shared)
+				//if (tsram->fields.mesi == cache_mesi_shared)
+		if (get_tsram_mesi_state(*tsram) == cache_mesi_shared)
 		{
 			miss_occurred = true;
 			cache_data->statistics.write_misses++;
@@ -150,7 +156,10 @@ bool Cache_WriteData(CacheData_s* cache_data, uint32_t address, uint32_t data)
 		uint16_t index = addr.as_bits.index * BLOCK_SIZE + addr.as_bits.offset;
 		cache_data->dsram[index] = data;
 		// update modified flag.
-		cache_data->tsram[addr.as_bits.index].fields.mesi = cache_mesi_modified;
+		//cache_data->tsram[addr.as_bits.index].fields.mesi = cache_mesi_modified;
+		uint32_t temp = cache_data->tsram[addr.as_bits.index];
+		set_mesi_state_to_tsram(&temp, (uint16_t*)cache_mesi_modified);
+		cache_data->tsram[addr.as_bits.index] = temp;
 		return true;
 	}
 	// we had a miss.
@@ -176,8 +185,9 @@ void Cache_PrintData(CacheData_s* cache_data, FILE* dsram_file, FILE* tsram_file
 	for (uint32_t i = 0; i < CACHE_SIZE; i++)
 		fprintf(dsram_file, "%08X\n", cache_data->dsram[i]);
 
-	for (uint32_t i = 0; i < FRAME_SIZE; i++)
-		fprintf(tsram_file, "%08X\n", cache_data->tsram[i].data);
+	for (uint32_t i = 0; i < TSRAM_NUMBER_OF_LINES; i++)
+		//fprintf(tsram_file, "%08X\n", cache_data->tsram[i].data);
+		fprintf(tsram_file, "%08X\n", cache_data->tsram[i]);
 }
 
 /************************************
@@ -185,12 +195,14 @@ void Cache_PrintData(CacheData_s* cache_data, FILE* dsram_file, FILE* tsram_file
 ************************************/
 static void dirty_block_handling(CacheData_s* data, cache_addess_s addr)
 {
-	if (data->tsram[addr.as_bits.index].fields.mesi == cache_mesi_modified)
+	//if (data->tsram[addr.as_bits.index].fields.mesi == cache_mesi_modified)
+	if (get_tsram_mesi_state(data->tsram[addr.as_bits.index]) == cache_mesi_modified)
 	{
 		// get stored block address
 		cache_addess_s block_addr = {
 			.as_bits.index = addr.as_bits.index,
-			.as_bits.tag = data->tsram[addr.as_bits.index].fields.tag,
+			//.as_bits.tag = data->tsram[addr.as_bits.index].fields.tag,
+			.as_bits.tag = get_tsram_tag(data->tsram[addr.as_bits.index]),
 			.as_bits.offset = 0
 		};
 
@@ -214,10 +226,12 @@ static bool shared_signal_handle(CacheData_s* data, Bus_packet_s* packet, bool* 
 		return false;
 
 	cache_addess_s address = { .address = packet->bus_addr };
-	Tsram_s* tsram = &(data->tsram[address.as_bits.index]);
+	//Tsram_s* tsram = &(data->tsram[address.as_bits.index]);
+	uint32_t* tsram = &(data->tsram[address.as_bits.index]);
 	//
-	*is_modified |= tsram->fields.mesi == cache_mesi_modified;
-	return tsram->fields.tag == address.as_bits.tag && tsram->fields.mesi != cache_mesi_invalid;
+	*is_modified |= get_tsram_mesi_state(*tsram) == cache_mesi_modified;
+	//return tsram->fields.tag == address.as_bits.tag && tsram->fields.mesi != cache_mesi_invalid;
+	return get_tsram_tag(*tsram) == address.as_bits.tag && get_tsram_mesi_state(*tsram) != cache_mesi_invalid;
 }
 
 static bool cache_snooping_handle(CacheData_s* data, Bus_packet_s* packet, uint8_t address_offset)
@@ -227,18 +241,23 @@ static bool cache_snooping_handle(CacheData_s* data, Bus_packet_s* packet, uint8
 		return false;
 
 	cache_addess_s address = { .address = packet->bus_addr };
-	Tsram_s* tsram = &(data->tsram[address.as_bits.index]);
+	//Tsram_s* tsram = &(data->tsram[address.as_bits.index]);
+	uint32_t* tsram = &(data->tsram[address.as_bits.index]);
 
 	// check if the block is in the cache, if not, do nothing.
-	if (tsram->fields.tag != address.as_bits.tag || tsram->fields.mesi == cache_mesi_invalid)
+	//if (tsram->fields.tag != address.as_bits.tag || tsram->fields.mesi == cache_mesi_invalid)
+	if (get_tsram_tag(*tsram) != address.as_bits.tag || get_tsram_mesi_state(*tsram) == cache_mesi_invalid)
 		return false;
 
 	// execute block state machine
-	Cache_mesi_e next_state = gSnoopingSM[tsram->fields.mesi](data, packet);
+	//Cache_mesi_e next_state = gSnoopingSM[tsram->fields.mesi](data, packet);
+	Cache_mesi_e next_state = gSnoopingSM[get_tsram_mesi_state(*tsram)](data, packet);
 
-	if (address_offset == (BLOCK_SIZE - 1) || tsram->fields.mesi != cache_mesi_modified)
+	//if (address_offset == (BLOCK_SIZE - 1) || tsram->fields.mesi != cache_mesi_modified)
+	if (address_offset == (BLOCK_SIZE - 1) || get_tsram_mesi_state(*tsram) != cache_mesi_modified)
 	{
-		tsram->fields.mesi = next_state;
+		//tsram->fields.mesi = next_state;
+		set_mesi_state_to_tsram(tsram, (uint16_t*)next_state);
 	}
 
 	return true;
@@ -259,10 +278,13 @@ static bool cache_response_handle(CacheData_s* data, Bus_packet_s* packet, uint8
 	}
 
 	cache_addess_s address = { .address = packet->bus_addr };
-	Tsram_s* tsram = &(data->tsram[address.as_bits.index]);
+	//Tsram_s* tsram = &(data->tsram[address.as_bits.index]);
+	uint32_t* tsram = &(data->tsram[address.as_bits.index]);
+	
 
 	// update the new tag
-	tsram->fields.tag = address.as_bits.tag;
+	//tsram->fields.tag = address.as_bits.tag;
+	set_tag_to_tsram(tsram, address.as_bits.tag);
 
 	// execute block state machine
 	if (packet->bus_cmd == bus_flush)
@@ -273,7 +295,11 @@ static bool cache_response_handle(CacheData_s* data, Bus_packet_s* packet, uint8
 
 	if (*address_offset == (BLOCK_SIZE - 1))
 	{
-		tsram->fields.mesi = packet->bus_shared ? cache_mesi_shared : cache_mesi_exclusive;
+		//tsram->fields.mesi = packet->bus_shared ? cache_mesi_shared : cache_mesi_exclusive;
+		if (true == packet->bus_shared)
+			set_mesi_state_to_tsram(tsram, (uint16_t*)cache_mesi_shared);
+		else
+			set_mesi_state_to_tsram(tsram, (uint16_t*)cache_mesi_exclusive);
 		return true;
 	}
 

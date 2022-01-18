@@ -7,7 +7,7 @@
 
 #define CACHE_SIZE	256
 #define BLOCK_SIZE	4
-#define FRAME_SIZE	(CACHE_SIZE / BLOCK_SIZE)
+#define TSRAM_NUMBER_OF_LINES 64
 
 typedef enum
 {
@@ -25,7 +25,7 @@ typedef enum
 	cache_mesi_modified,
 
 } Cache_mesi_e;
-
+/*
 typedef union
 {
 	uint32_t data;
@@ -36,6 +36,8 @@ typedef union
 		uint16_t mesi : 2;	// [12:13]
 	}fields;
 } Tsram_s;
+*/
+
 
 typedef struct
 {
@@ -50,7 +52,8 @@ typedef struct
 	Cache_Id_e id;
 	bool memory_stall;
 	uint32_t dsram[CACHE_SIZE];
-	Tsram_s tsram[FRAME_SIZE];
+	//Tsram_s tsram[TSRAM_NUMBER_OF_LINES];
+	uint32_t tsram[TSRAM_NUMBER_OF_LINES];
 	CacheStatistics_s statistics;
 } CacheData_s;
 

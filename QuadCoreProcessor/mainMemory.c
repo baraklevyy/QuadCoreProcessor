@@ -20,27 +20,6 @@ ALL RIGHTS RESERVED
 #include "helper.h"
 #include <string.h>
 
-/************************************
-*       types                       *
-************************************/
-/*
-typedef union
-{
-	uint32_t address;
-
-	struct
-	{
-		uint16_t offset : 2;	// [0:1]
-		uint32_t block : 18;	// [2:19]
-	} fields;
-} memory_addess_s;
-*/
-/*
-typedef struct
-{
-	uint32_t address;
-} memory_addess_s;
-*/
 
 /************************************
 *      variables                    *

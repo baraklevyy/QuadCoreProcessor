@@ -51,6 +51,19 @@ typedef struct
 } memory_addess_s;
 
 
+/*
+typedef struct
+{
+	uint32_t data;
+
+	struct
+	{
+		uint16_t tag : 12;	// [0:11]
+		uint16_t mesi : 2;	// [12:13]
+	}fields;
+} Tsram_s;
+*/
+
 /*File declarations*/
 typedef struct
 	{
@@ -79,6 +92,10 @@ enum file_names_E{ imem0 = 1, imem1 , imem2, imem3,
 uint16_t get_address_offset(uint32_t address);
 uint16_t get_address_block(uint32_t address);
 void set_offset_to_address(uint32_t* address, uint8_t offset);
+uint16_t get_tsram_tag(uint32_t tsram);
+uint16_t get_tsram_mesi_state(uint32_t tsram);
+void set_tag_to_tsram(uint32_t* tsram, uint16_t tag);
+void set_mesi_state_to_tsram(uint32_t* tsram, uint16_t mesi_state);
 
 
 #endif //__FILE_NAME_H__
