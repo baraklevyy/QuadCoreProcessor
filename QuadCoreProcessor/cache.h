@@ -4,18 +4,18 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include "helper.h"
 
-#define CACHE_SIZE	256
-#define BLOCK_SIZE	4
-#define TSRAM_NUMBER_OF_LINES 64
 
+/*
 typedef enum
 {
 	cache_core0,
 	cache_core1,
-	cache_core2,
+	2,
 	cache_core3,
 } Cache_Id_e;
+*/
 /*
 typedef enum
 {
@@ -50,20 +50,20 @@ typedef struct
 
 typedef struct
 {
-	Cache_Id_e id;
+	core_identifier id;
 	bool memory_stall;
 	uint32_t dsram[CACHE_SIZE];
 	//Tsram_s tsram[TSRAM_NUMBER_OF_LINES];
 	uint32_t tsram[TSRAM_NUMBER_OF_LINES];
 	CacheStatistics_s statistics;
-} CacheData_s;
+} cache_information;
 
 
-void Cache_Init(CacheData_s* data, Cache_Id_e id);
+void Cache_Init(cache_information* data, core_identifier id);
 void Cache_RegisterBusHandles(void);
-bool Cache_ReadData(CacheData_s* cache_data, uint32_t address, uint32_t* data);
-bool Cache_WriteData(CacheData_s* cache_data, uint32_t address, uint32_t data);
-void Cache_PrintData(CacheData_s* cache_data, FILE* dsram_file, FILE* tsram_file);
+bool Cache_ReadData(cache_information* cache_data, uint32_t address, uint32_t* data);
+bool Cache_WriteData(cache_information* cache_data, uint32_t address, uint32_t data);
+void Cache_PrintData(cache_information* cache_data, FILE* dsram_file, FILE* tsram_file);
 
 
 #endif 

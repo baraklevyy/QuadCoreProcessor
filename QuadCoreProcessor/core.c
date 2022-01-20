@@ -72,7 +72,7 @@ void Core_Init(Core_s* core, uint8_t id)
 	memset(&core->pipeline, 0, sizeof(Pipeline_s));
 	Pipeline_Init(&core->pipeline);
 
-	memset(&core->pipeline.cache_data, 0, sizeof(CacheData_s));
+	memset(&core->pipeline.cache_data, 0, sizeof(cache_information));
 	Cache_Init(&core->pipeline.cache_data, id);
 
 	//TODO: maybe move it to different location.

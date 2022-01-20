@@ -19,11 +19,11 @@ enum file_names_E;
 
 int main(int argc, char* argv[])
 {
-	
-	uint32_t res = 0x00000001;
-	uint32_t test = 0xffff3fff;
-	set_index_to_cache_address(&res, test);
-	
+	/*
+	uint32_t cmd = 0xbf2519f3;
+	uint16_t res;
+	res = get_command_opcode(cmd);
+	*/
 
 
 

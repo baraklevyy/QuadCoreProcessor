@@ -17,6 +17,7 @@ ALL RIGHTS RESERVED
 #include <stdint.h>
 #include <stdio.h>
 
+#define MAX_INTEGER 0xffffui16
 #define MAIN_MEMORY_SIZE 1048576 
 #define BAD_EXIT_CODE 1
 #define NUMBER_OF_REGISTERS 16
@@ -24,10 +25,14 @@ ALL RIGHTS RESERVED
 #define REG_IMM 1
 #define NEXT_INSTRUCTION_ADDRESS_REGISTER 15
 #define CORES_NUMBER 4
+#define CACHE_SIZE	256
+#define BLOCK_SIZE	4
+#define TSRAM_NUMBER_OF_LINES 64
 
 /************************************
 *       types                       *
 ************************************/
+/*
 typedef union
 {
 	struct
@@ -41,7 +46,7 @@ typedef union
 
 	uint32_t cmd;
 } inst;
-
+*/
 
 typedef struct
 {
@@ -63,6 +68,16 @@ typedef struct
 	}fields;
 } Tsram_s;
 */
+/*
+typedef struct
+{
+	uint32_t read_hits;
+	uint32_t write_hits;
+	uint32_t read_misses;
+	uint32_t write_misses;
+} CacheStatistics_s;
+*/
+
 
 /*File declarations*/
 typedef struct
@@ -75,9 +90,37 @@ typedef struct
 		FILE* StatsFile;
 	} output_core_file;
 
+/*
+typedef struct
+{
+	core_identifier id;
+	bool memory_stall;
+	uint32_t dsram[CACHE_SIZE];
+	//Tsram_s tsram[TSRAM_NUMBER_OF_LINES];
+	uint32_t tsram[TSRAM_NUMBER_OF_LINES];
+	CacheStatistics_s statistics;
+} cache_information;
+*/
+/*
+typedef struct
+{
+	uint32_t read_hits;
+	uint32_t write_hits;
+	uint32_t read_misses;
+	uint32_t write_misses;
+} CacheStatistics_s;
 
 
-
+typedef struct
+{
+	core_identifier id;
+	bool memory_stall;
+	uint32_t dsram[CACHE_SIZE];
+	//Tsram_s tsram[TSRAM_NUMBER_OF_LINES];
+	uint32_t tsram[TSRAM_NUMBER_OF_LINES];
+	CacheStatistics_s statistics;
+} cache_information;
+*/
 
 
 
@@ -92,7 +135,7 @@ FILE* MeminFile;
 FILE* MemoutFile;
 FILE* BusTraceFile;
 
-enum core_E{core0, core1, core2, core3};
+enum core_E{core0=0, core1, core2, core3};
 enum file_names_E{ imem0 = 1, imem1 , imem2, imem3,
 	memin, memout,
 	regout0, regout1, regout2, regout3,
@@ -101,7 +144,9 @@ enum file_names_E{ imem0 = 1, imem1 , imem2, imem3,
 	tsram0, tsram1, tsram2, tsram3,
 	stats0, stats1, stats2, stats3};
 
-typedef enum{invalid, shared, exclusive, modified} mesi_state;
+typedef enum{invalid=0, shared, exclusive, modified} mesi_state;
+typedef enum{CORE0=0, CORE1, CORE2, CORE3,} core_identifier;
+
 
 
 uint16_t get_address_offset(uint32_t address);
@@ -117,6 +162,11 @@ uint32_t get_cache_address_tag(uint32_t cache);
 void set_offset_to_cache_address(uint32_t* cache, uint32_t offset);
 void set_index_to_cache_address(uint32_t* cache, uint32_t index);
 void set_tag_to_cache_address(uint32_t* cache, uint32_t tag);
+uint16_t get_command_immediate(uint32_t cmd);
+uint16_t get_command_rt(uint32_t cmd);
+uint16_t get_command_rs(uint32_t cmd);
+uint16_t get_command_rd(uint32_t cmd);
+uint16_t get_command_opcode(uint32_t cmd);
 
 
 #endif //__FILE_NAME_H__

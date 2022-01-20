@@ -24,7 +24,8 @@ typedef struct
 {
 	PipelineSM_e state;
 	uint16_t pc;
-	inst instruction;
+	//inst instruction;
+	uint32_t instruction;
 	uint32_t execute_result;
 	void (*operation)(Opcode_fucntion_params_s* params);
 } PipelineStage_s;
@@ -42,7 +43,7 @@ typedef struct
 	bool memory_stall;
 	uint32_t* insturcionts_p;
 	uint32_t* core_registers_p;
-	CacheData_s cache_data;
+	cache_information cache_data;
 	PipelineStage_s pipe_stages[PIPELINE_SIZE];
 	Opcode_fucntion_params_s opcode_params;
 	PiplineStatistics_s statistics;
@@ -51,6 +52,8 @@ typedef struct
 void Pipeline_Init(Pipeline_s* pipeline);
 void Pipeline_Execute(Pipeline_s* pipeline);
 void Pipeline_WriteToTrace(Pipeline_s* pipeline, FILE* trace_file);
+bool reg_compare_logic(uint32_t instruction, uint16_t reg, uint16_t op_code);
+bool reg_compare_helper(uint16_t reg1, uint16_t reg2);
 void Pipeline_BubbleCommands(Pipeline_s* pipeline);
 bool Pipeline_PipeFlushed(Pipeline_s* pipeline);
 

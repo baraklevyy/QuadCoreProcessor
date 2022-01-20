@@ -62,7 +62,7 @@ static void (*OpcodeMapping[NUMBER_OF_OPCODES])(Opcode_fucntion_params_s* params
 	 BranchLessEqual, BranchGraterEqual, JumpAndLink
 };
 
-bool Opcode_IsBranchResulotion(uint16_t opcode);
-bool Opcode_IsMemoryCommand(uint16_t opcode);
+//bool Opcode_IsBranchResulotion(uint16_t opcode);
+//bool Opcode_IsMemoryCommand(uint16_t opcode);
 
 #endif

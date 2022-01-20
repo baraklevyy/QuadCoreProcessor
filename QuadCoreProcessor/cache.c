@@ -15,24 +15,24 @@ typedef union
 	} as_bits;
 } cache_addess_s;
 */
-typedef mesi_state(*snooping_state)(CacheData_s* data, Bus_packet_s* packet);
+typedef mesi_state(*snooping_state)(cache_information* data, Bus_packet_s* packet);
 
 /************************************
 *      static functions             *
 ************************************/
-//static void dirty_block_handling(CacheData_s* data, cache_addess_s addr);
-static void dirty_block_handling(CacheData_s* data, uint32_t addr);
+//static void dirty_block_handling(cache_information* data, cache_addess_s addr);
+static void dirty_block_handling(cache_information* data, uint32_t addr);
 
 // handles
-static bool shared_signal_handle(CacheData_s* data, Bus_packet_s* packet, bool* is_modified);
-static bool cache_snooping_handle(CacheData_s* data, Bus_packet_s* packet, uint8_t address_offset);
-static bool cache_response_handle(CacheData_s* data, Bus_packet_s* packet, uint8_t* address_offset);
+static bool shared_signal_handle(cache_information* data, Bus_packet_s* packet, bool* is_modified);
+static bool cache_snooping_handle(cache_information* data, Bus_packet_s* packet, uint8_t address_offset);
+static bool cache_response_handle(cache_information* data, Bus_packet_s* packet, uint8_t* address_offset);
 
 // state machine for snooping
-static mesi_state mesi_snooping_invalid_state(CacheData_s* data, Bus_packet_s* packet);
-static mesi_state mesi_snooping_shared_state(CacheData_s* data, Bus_packet_s* packet);
-static mesi_state mesi_snooping_exlusive_state(CacheData_s* data, Bus_packet_s* packet);
-static mesi_state mesi_snooping_modified_state(CacheData_s* data, Bus_packet_s* packet);
+static mesi_state mesi_snooping_invalid_state(cache_information* data, Bus_packet_s* packet);
+static mesi_state mesi_snooping_shared_state(cache_information* data, Bus_packet_s* packet);
+static mesi_state mesi_snooping_exlusive_state(cache_information* data, Bus_packet_s* packet);
+static mesi_state mesi_snooping_modified_state(cache_information* data, Bus_packet_s* packet);
 
 /************************************
 *      variables                    *
@@ -47,7 +47,7 @@ static snooping_state gSnoopingSM[4] = {
 /************************************
 *       API implementation          *
 ************************************/
-void Cache_Init(CacheData_s* data, Cache_Id_e id)
+void Cache_Init(cache_information* data, core_identifier id)
 {
 	// set all cache memory to 0;
 	memset((uint8_t*)data, 0, sizeof(data));
@@ -67,7 +67,7 @@ void Cache_RegisterBusHandles(void)
 		cache_response_handle);
 }
 
-bool Cache_ReadData(CacheData_s* cache_data, uint32_t address, uint32_t* data)
+bool Cache_ReadData(cache_information* cache_data, uint32_t address, uint32_t* data)
 {
 	static bool miss_occurred = false;
 
@@ -120,7 +120,7 @@ bool Cache_ReadData(CacheData_s* cache_data, uint32_t address, uint32_t* data)
 	return false;
 }
 
-bool Cache_WriteData(CacheData_s* cache_data, uint32_t address, uint32_t data)
+bool Cache_WriteData(cache_information* cache_data, uint32_t address, uint32_t data)
 {
 	static bool miss_occurred = false;
 
@@ -197,7 +197,7 @@ bool Cache_WriteData(CacheData_s* cache_data, uint32_t address, uint32_t data)
 	return false;
 }
 
-void Cache_PrintData(CacheData_s* cache_data, FILE* dsram_file, FILE* tsram_file)
+void Cache_PrintData(cache_information* cache_data, FILE* dsram_file, FILE* tsram_file)
 {
 	for (uint32_t i = 0; i < CACHE_SIZE; i++)
 		fprintf(dsram_file, "%08X\n", cache_data->dsram[i]);
@@ -211,7 +211,7 @@ void Cache_PrintData(CacheData_s* cache_data, FILE* dsram_file, FILE* tsram_file
 * static implementation             *
 ************************************/
 //static void dirty_block_handling(CacheData_s* data, cache_addess_s addr)
-static void dirty_block_handling(CacheData_s* data, uint32_t addr)
+static void dirty_block_handling(cache_information* data, uint32_t addr)
 {
 	//if (data->tsram[addr.as_bits.index].fields.mesi == cache_mesi_modified)
 	//if (get_tsram_mesi_state(data->tsram[addr.as_bits.index]) == modified)
@@ -249,7 +249,7 @@ static void dirty_block_handling(CacheData_s* data, uint32_t addr)
 }
 
 
-static bool shared_signal_handle(CacheData_s* data, Bus_packet_s* packet, bool* is_modified)
+static bool shared_signal_handle(cache_information* data, Bus_packet_s* packet, bool* is_modified)
 {
 	// check if this is my packet
 	if (data->id == packet->bus_origid)
@@ -267,7 +267,7 @@ static bool shared_signal_handle(CacheData_s* data, Bus_packet_s* packet, bool* 
 	return get_tsram_tag(*tsram) == get_cache_address_tag(address) && get_tsram_mesi_state(*tsram) != invalid;
 }
 
-static bool cache_snooping_handle(CacheData_s* data, Bus_packet_s* packet, uint8_t address_offset)
+static bool cache_snooping_handle(cache_information* data, Bus_packet_s* packet, uint8_t address_offset)
 {
 	// check if this is my packet
 	if (data->id == packet->bus_original_sender && packet->bus_cmd != bus_flush)
@@ -299,7 +299,7 @@ static bool cache_snooping_handle(CacheData_s* data, Bus_packet_s* packet, uint8
 	return true;
 }
 
-static bool cache_response_handle(CacheData_s* data, Bus_packet_s* packet, uint8_t* address_offset)
+static bool cache_response_handle(cache_information* data, Bus_packet_s* packet, uint8_t* address_offset)
 {
 	// check if this is my packet
 	if (data->id == packet->bus_origid && packet->bus_cmd != bus_flush)
@@ -348,12 +348,12 @@ static bool cache_response_handle(CacheData_s* data, Bus_packet_s* packet, uint8
 }
 
 // state machine for snooping
-static mesi_state mesi_snooping_invalid_state(CacheData_s* data, Bus_packet_s* packet)
+static mesi_state mesi_snooping_invalid_state(cache_information* data, Bus_packet_s* packet)
 {
 	return invalid;
 }
 
-static mesi_state mesi_snooping_shared_state(CacheData_s* data, Bus_packet_s* packet)
+static mesi_state mesi_snooping_shared_state(cache_information* data, Bus_packet_s* packet)
 {
 	if (packet->bus_cmd == bus_busRdX)
 		return invalid;
@@ -361,7 +361,7 @@ static mesi_state mesi_snooping_shared_state(CacheData_s* data, Bus_packet_s* pa
 	return shared;
 }
 
-static mesi_state mesi_snooping_exlusive_state(CacheData_s* data, Bus_packet_s* packet)
+static mesi_state mesi_snooping_exlusive_state(cache_information* data, Bus_packet_s* packet)
 {
 	if (packet->bus_cmd == bus_busRd)
 		return shared;
@@ -372,7 +372,7 @@ static mesi_state mesi_snooping_exlusive_state(CacheData_s* data, Bus_packet_s* 
 	return exclusive;
 }
 
-static mesi_state mesi_snooping_modified_state(CacheData_s* data, Bus_packet_s* packet)
+static mesi_state mesi_snooping_modified_state(cache_information* data, Bus_packet_s* packet)
 {
 	//cache_addess_s address = { .address = packet->bus_addr };
 	uint32_t address = packet->bus_addr;

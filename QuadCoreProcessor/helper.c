@@ -125,3 +125,49 @@ void set_tag_to_cache_address(uint32_t* cache, uint32_t tag) {
 	mask = (mask << 8);
 	*cache = (*cache) | mask;
 }
+
+
+
+/*
+typedef union
+{
+	struct
+	{
+		uint16_t immediate : 12;
+		uint16_t rt : 4;
+		uint16_t rs : 4;
+		uint16_t rd : 4;
+		uint16_t opcode : 8;
+	} bits;
+
+	uint32_t cmd;
+} inst;*/
+uint16_t get_command_immediate(uint32_t cmd) {
+	uint32_t mask = 0x00000fff; //// setting ones just in the index location [0:11]
+	uint16_t immediate = cmd & mask;
+	return immediate;
+}
+uint16_t get_command_rt(uint32_t cmd) {
+	uint32_t mask = 0x0000f000; // setting ones just in the index location [12:15]
+	uint16_t rt= cmd & mask;
+	rt = (rt >> 12); //need to shift the bits back to the lsb in order to isolate rt
+	return rt;
+}
+uint16_t get_command_rs(uint32_t cmd) {
+	uint32_t mask = 0x000f0000; // setting ones just in the index location [16:19]
+	uint32_t rs = cmd & mask;
+	rs = (rs >> 16); //need to shift the bits back to the lsb in order to isolate rs
+	return (uint16_t*)rs;
+}
+uint16_t get_command_rd(uint32_t cmd) {
+	uint32_t mask = 0x00f00000; // setting ones just in the index location [20:23]
+	uint32_t rd = cmd & mask;
+	rd = (rd >> 20); //need to shift the bits back to the lsb in order to isolate rd
+	return (uint16_t*)rd;
+}
+uint16_t get_command_opcode(uint32_t cmd) {
+	uint32_t mask = 0xff000000; // setting ones just in the index location [24:31]
+	uint32_t opcode = cmd & mask;
+	opcode = (opcode >> 24); //need to shift the bits back to the lsb in order to isolate opcode
+	return (uint16_t*)opcode;
+}

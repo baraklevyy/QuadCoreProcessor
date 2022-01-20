@@ -6,6 +6,7 @@
 ************************************/
 #include <stdint.h>
 #include <stdbool.h>
+#include "helper.h"
 
 /************************************
 *      definitions                 *
