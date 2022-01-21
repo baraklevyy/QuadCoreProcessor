@@ -28,6 +28,8 @@ ALL RIGHTS RESERVED
 #define CACHE_SIZE	256
 #define BLOCK_SIZE	4
 #define TSRAM_NUMBER_OF_LINES 64
+#define PIPELINE_SIZE 5
+#define _CSECURE_NO_WARNINGS
 
 /************************************
 *       types                       *
@@ -122,6 +124,14 @@ typedef struct
 } cache_information;
 */
 
+typedef struct
+{
+	bool* is_command_in_halt;
+	uint32_t rs;
+	uint16_t* pc;
+	uint32_t* rd;
+	uint32_t rt;
+}parameters_to_command;
 
 
 
@@ -146,7 +156,7 @@ enum file_names_E{ imem0 = 1, imem1 , imem2, imem3,
 
 typedef enum{invalid=0, shared, exclusive, modified} mesi_state;
 typedef enum{CORE0=0, CORE1, CORE2, CORE3,} core_identifier;
-
+typedef enum { ADD = 0, SUB, AND, OR, XOR, MUL, SLL, SRA, SRL, BEQ, BNE, BLT, BGT, BLE, BGE, JAL, LW, SW, HALT = 20 }OpcodeOperations;
 
 
 uint16_t get_address_offset(uint32_t address);
@@ -167,6 +177,33 @@ uint16_t get_command_rt(uint32_t cmd);
 uint16_t get_command_rs(uint32_t cmd);
 uint16_t get_command_rd(uint32_t cmd);
 uint16_t get_command_opcode(uint32_t cmd);
+void add(parameters_to_command* arguments_to_cmd);
+void sub(parameters_to_command* arguments_to_cmd);
+void and (parameters_to_command* arguments_to_cmd);
+void or (parameters_to_command * arguments_to_cmd);
+void xor (parameters_to_command* arguments_to_cmd);
+void mul(parameters_to_command* arguments_to_cmd);
+void sll(parameters_to_command* arguments_to_cmd);
+void sra(parameters_to_command* arguments_to_cmd);
+void srl(parameters_to_command* arguments_to_cmd);
+void beq(parameters_to_command* arguments_to_cmd);
+void bne(parameters_to_command* arguments_to_cmd);
+void blt(parameters_to_command* arguments_to_cmd);
+void bgt(parameters_to_command* arguments_to_cmd);
+void ble(parameters_to_command* arguments_to_cmd);
+void bge(parameters_to_command* arguments_to_cmd);
+void jal(parameters_to_command* arguments_to_cmd);
+
+static void (*opcode_command_function_pointer[16])(parameters_to_command* arguments_to_cmd) = {
+	 add, sub, and, or, xor, mul, sll, sra,
+	 srl, beq, bne, blt, bgt,
+	 ble, bge, jal
+};
+
+
+
+
+
 
 
 #endif //__FILE_NAME_H__

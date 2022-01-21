@@ -53,7 +53,6 @@ typedef struct
 	core_identifier id;
 	bool memory_stall;
 	uint32_t dsram[CACHE_SIZE];
-	//Tsram_s tsram[TSRAM_NUMBER_OF_LINES];
 	uint32_t tsram[TSRAM_NUMBER_OF_LINES];
 	CacheStatistics_s statistics;
 } cache_information;

@@ -32,7 +32,7 @@ ALL RIGHTS RESERVED
 *      static functions             *
 ************************************/
 static int init_memory(Core_s* core);
-static void write_trace(Core_s* core, uint32_t* regs_copy);
+static void write_trace(Core_s* core, uint32_t* registers);
 static void write_regs_to_file(Core_s* core, uint32_t* regs_copy);
 static void update_statistics(Core_s* core);
 static void print_register_file(Core_s* core);
@@ -67,18 +67,18 @@ void Core_Init(Core_s* core, uint8_t id)
 	core->core_halted = false;
 
 	memset(&core->statistics, 0, sizeof(Statistics_s));
-	core->statistics.cycles = -1; // To start the count from 0.
+	core->statistics.cycles = -1; 
 
 	memset(&core->pipeline, 0, sizeof(Pipeline_s));
-	Pipeline_Init(&core->pipeline);
+	initialize_pip(&core->pipeline);
 
-	memset(&core->pipeline.cache_data, 0, sizeof(cache_information));
-	Cache_Init(&core->pipeline.cache_data, id);
+	memset(&core->pipeline.current_data_from_cache, 0, sizeof(cache_information));
+	Cache_Init(&core->pipeline.current_data_from_cache, id);
 
 	//TODO: maybe move it to different location.
 	Cache_RegisterBusHandles();
 
-	core->pipeline.core_registers_p = core->register_array;
+	core->pipeline.current_core_regs = core->register_array;
 	core->pipeline.insturcionts_p = core->instructions_memory_image;
 	core->pipeline.opcode_params.pc = &(core->program_counter);
 }
@@ -100,7 +100,7 @@ void Core_Iter(Core_s* core)
 		return;
 	}
 
-	if (Pipeline_PipeFlushed(&core->pipeline))
+	if (flush_the_pipe(&core->pipeline))
 	{
 		core->core_halted = true;
 		return;
@@ -112,7 +112,7 @@ void Core_Iter(Core_s* core)
 	update_statistics(core);
 	Pipeline_Execute(&core->pipeline, core->index);
 	write_trace(core, regs_copy);
-	Pipeline_BubbleCommands(&core->pipeline);
+	add_idle_slot(&core->pipeline);
 }
 
 /*!
@@ -126,7 +126,7 @@ Teardown of the code.
 void Core_Teaddown(Core_s* core)
 {
 	print_register_file(core);
-	Cache_PrintData(&core->pipeline.cache_data,
+	Cache_PrintData(&core->pipeline.current_data_from_cache,
 		core->core_files.dsram_F, core->core_files.TsRamFile);
 	print_statistics(core);
 }
@@ -170,20 +170,12 @@ static int init_memory(Core_s* core)
 	return number_of_lines;
 }
 
-/*!
-******************************************************************************
-\brief
-Writing the trace of the core.
-\param
- [in] core				  - the operating core
- [in] uint32_t *regs_copy - pointer to the regs copied values.
-\return none
-*****************************************************************************/
-static void write_trace(Core_s* core, uint32_t* regs_copy)
+
+static void write_trace(Core_s* core, uint32_t* registers)
 {
 	fprintf(core->core_files.core_trace_F, "%d ", core->statistics.cycles);
-	Pipeline_WriteToTrace(&core->pipeline, core->core_files.core_trace_F);
-	write_regs_to_file(core, regs_copy);
+	tracing_pip(&core->pipeline, core->core_files.core_trace_F);
+	write_regs_to_file(core, registers);
 	fprintf(core->core_files.core_trace_F, "\n");
 
 }
@@ -218,7 +210,7 @@ static void update_statistics(Core_s* core)
 {
 	core->statistics.cycles++;
 
-	if (!core->pipeline.halted && !core->pipeline.memory_stall && !core->pipeline.data_hazard_stall)
+	if (!core->pipeline.is_pip_halt && !core->pipeline.is_mem_stall && !core->pipeline.is_data_stall)
 		core->statistics.instructions++;
 }
 
@@ -243,10 +235,10 @@ static void print_statistics(Core_s* core)
 {
 	fprintf(core->core_files.StatsFile, "cycles %d\n", core->statistics.cycles + 1);
 	fprintf(core->core_files.StatsFile, "instructions %d\n", core->statistics.instructions - 1);
-	fprintf(core->core_files.StatsFile, "read_hit %d\n", core->pipeline.cache_data.statistics.read_hits);
-	fprintf(core->core_files.StatsFile, "write_hit %d\n", core->pipeline.cache_data.statistics.write_hits);
-	fprintf(core->core_files.StatsFile, "read_miss %d\n", core->pipeline.cache_data.statistics.read_misses);
-	fprintf(core->core_files.StatsFile, "write_miss %d\n", core->pipeline.cache_data.statistics.write_misses);
-	fprintf(core->core_files.StatsFile, "decode_stall %d\n", core->pipeline.statistics.decode_stalls);
-	fprintf(core->core_files.StatsFile, "mem_stall %d\n", core->pipeline.statistics.mem_stalls);
+	fprintf(core->core_files.StatsFile, "read_hit %d\n", core->pipeline.current_data_from_cache.statistics.read_hits);
+	fprintf(core->core_files.StatsFile, "write_hit %d\n", core->pipeline.current_data_from_cache.statistics.write_hits);
+	fprintf(core->core_files.StatsFile, "read_miss %d\n", core->pipeline.current_data_from_cache.statistics.read_misses);
+	fprintf(core->core_files.StatsFile, "write_miss %d\n", core->pipeline.current_data_from_cache.statistics.write_misses);
+	fprintf(core->core_files.StatsFile, "decode_stall %d\n", core->pipeline.current_pip_decode_stalls);
+	fprintf(core->core_files.StatsFile, "mem_stall %d\n", core->pipeline.current_pip_memory_stalls);
 }

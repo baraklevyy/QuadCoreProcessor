@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include "Cache.h"
 #include "helper.h"
-#include "opcode.h"
+
 
 
 typedef enum
@@ -15,47 +15,41 @@ typedef enum
 	DECODE,
 	EXECUTE,
 	MEM,
-	WRITE_BACK,
-
-	PIPELINE_SIZE
-} PipelineSM_e;
+	WRITE_BACK
+} state_of_pipeline;
 
 typedef struct
 {
-	PipelineSM_e state;
-	uint16_t pc;
-	//inst instruction;
+	state_of_pipeline state;
 	uint32_t instruction;
-	uint32_t execute_result;
-	void (*operation)(Opcode_fucntion_params_s* params);
-} PipelineStage_s;
+	uint32_t execution_output;
+	void (*operation)(parameters_to_command* arguments_to_cmd);
+	uint16_t pc;
+} current_pipeline_information;
+
 
 typedef struct
 {
-	uint32_t decode_stalls;
-	uint32_t mem_stalls;
-} PiplineStatistics_s;
-
-typedef struct
-{
-	bool halted;
-	bool data_hazard_stall;
-	bool memory_stall;
 	uint32_t* insturcionts_p;
-	uint32_t* core_registers_p;
-	cache_information cache_data;
-	PipelineStage_s pipe_stages[PIPELINE_SIZE];
-	Opcode_fucntion_params_s opcode_params;
-	PiplineStatistics_s statistics;
+	uint32_t* current_core_regs;
+	cache_information current_data_from_cache;
+	current_pipeline_information pipe_stages[PIPELINE_SIZE];
+	parameters_to_command opcode_params;
+	uint32_t current_pip_decode_stalls;
+	uint32_t current_pip_memory_stalls;
+	bool is_pip_halt;
+	bool is_data_stall;
+	bool is_mem_stall;
 }Pipeline_s;
 
-void Pipeline_Init(Pipeline_s* pipeline);
+void initialize_pip(Pipeline_s* pipeline);
 void Pipeline_Execute(Pipeline_s* pipeline);
-void Pipeline_WriteToTrace(Pipeline_s* pipeline, FILE* trace_file);
-bool reg_compare_logic(uint32_t instruction, uint16_t reg, uint16_t op_code, uint16_t op_write__back);
+void tracing_pip(Pipeline_s* pipeline, FILE* trace_file);
+bool reg_compare_logic(uint32_t instruction, uint16_t reg, uint16_t op_code, uint16_t op_write_);
 bool reg_compare_helper(uint16_t reg1, uint16_t reg2);
-void Pipeline_BubbleCommands(Pipeline_s* pipeline);
-bool Pipeline_PipeFlushed(Pipeline_s* pipeline);
+bool is_flush_require(Pipeline_s* pip, int phase);
+void add_idle_slot(Pipeline_s* pipeline);
+bool flush_the_pipe(Pipeline_s* pipeline);
 
 
 #endif

@@ -6,7 +6,109 @@
 
 
 
+void add (parameters_to_command* arguments_to_cmd)
+{
+	*(arguments_to_cmd->rd) = ((arguments_to_cmd->rs)) + ((arguments_to_cmd->rt));
+}
 
+void sub (parameters_to_command* arguments_to_cmd)
+{
+	*(arguments_to_cmd->rd) = ((arguments_to_cmd->rs)) - ((arguments_to_cmd->rt));
+}
+
+void and (parameters_to_command* arguments_to_cmd)
+{
+	*(arguments_to_cmd->rd) = (arguments_to_cmd->rs) & (arguments_to_cmd->rt);
+}
+
+
+void or (parameters_to_command * arguments_to_cmd)
+{
+	*(arguments_to_cmd->rd) = (arguments_to_cmd->rs) | (arguments_to_cmd->rt);
+}
+
+void xor (parameters_to_command* arguments_to_cmd)
+{
+	*(arguments_to_cmd->rd) = (arguments_to_cmd->rs) ^ (arguments_to_cmd->rt);
+}
+
+
+void mul(parameters_to_command* arguments_to_cmd)
+{
+	*(arguments_to_cmd->rd) = (arguments_to_cmd->rs) * (arguments_to_cmd->rt);
+}
+
+void sll (parameters_to_command* arguments_to_cmd)
+{
+	*(arguments_to_cmd->rd) = (arguments_to_cmd->rs) << (arguments_to_cmd->rt);
+}
+
+
+void sra (parameters_to_command* arguments_to_cmd)
+{
+	*(arguments_to_cmd->rd) = (int)(arguments_to_cmd->rs) >> (int)(arguments_to_cmd->rt);
+}
+
+
+void srl (parameters_to_command* arguments_to_cmd)
+{
+	*(arguments_to_cmd->rd) = (arguments_to_cmd->rs) >> (arguments_to_cmd->rt);
+}
+
+void beq (parameters_to_command* arguments_to_cmd)
+{
+	if ((arguments_to_cmd->rs) == (arguments_to_cmd->rt))
+	{
+		*(arguments_to_cmd->pc) = (uint16_t)(*(arguments_to_cmd->rd) & 0x1FF);
+	}
+}
+
+void bne (parameters_to_command* arguments_to_cmd)
+{
+	if ((arguments_to_cmd->rs) != (arguments_to_cmd->rt))
+	{
+		*(arguments_to_cmd->pc) = (uint16_t)(*(arguments_to_cmd->rd) & 0x1FF);
+	}
+}
+
+
+void blt (parameters_to_command* arguments_to_cmd)
+{
+	if ((arguments_to_cmd->rs) < (arguments_to_cmd->rt))
+	{
+		*(arguments_to_cmd->pc) = (uint16_t)(*(arguments_to_cmd->rd) & 0x1FF);
+	}
+}
+
+void bgt (parameters_to_command* arguments_to_cmd)
+{
+	if ((arguments_to_cmd->rs) > (arguments_to_cmd->rt))
+	{
+		*(arguments_to_cmd->pc) = (uint16_t)(*(arguments_to_cmd->rd) & 0x1FF);
+	}
+}
+
+void ble (parameters_to_command* arguments_to_cmd)
+{
+	if ((arguments_to_cmd->rs) <= (arguments_to_cmd->rt))
+	{
+		*(arguments_to_cmd->pc) = (uint16_t)(*(arguments_to_cmd->rd) & 0x1FF);
+	}
+}
+
+void bge (parameters_to_command* arguments_to_cmd)
+{
+	if ((arguments_to_cmd->rs) >= (arguments_to_cmd->rt))
+	{
+		*(arguments_to_cmd->pc) = (uint16_t)(*(arguments_to_cmd->rd) & 0x1FF);
+	}
+}
+
+void jal (parameters_to_command* arguments_to_cmd)
+{
+	*(arguments_to_cmd->rd) = *(arguments_to_cmd->pc);
+	*(arguments_to_cmd->pc) = (uint16_t)(*(arguments_to_cmd->rd) & 0x1FF);
+}
 
 uint16_t get_address_offset(uint32_t address) {
 	uint32_t mask = 0x00000003;

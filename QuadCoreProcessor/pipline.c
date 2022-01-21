@@ -1,189 +1,84 @@
-/*!
-******************************************************************************
-\file Pipeline.c
-\date 17 October 2021
-\author Rony Kositsky & Ofir Guthman & Yonatan Gartenberg
-\brief
-\details
-\par Copyright
-(c) Copyright 2021 Ofir & Rony & Yonatan
-\par
-ALL RIGHTS RESERVED
-*****************************************************************************/
 
-/************************************
-*      include                      *
-************************************/
 #include "pipline.h"
 #include <string.h>
 #include "cache.h"
 
-/************************************
-*      static functions             *
-************************************/
-static void fetch(Pipeline_s* pipeline);
-static void decode(Pipeline_s* pipeline);
-static void execute(Pipeline_s* pipeline);
-static void mem(Pipeline_s* pipeline);
-static void writeback(Pipeline_s* pipeline);
-static void execute_stages(Pipeline_s* pipeline);
-static void prepare_registers_params(Pipeline_s* pipeline, PipelineSM_e stage);
-static bool pipeline_needs_data_hazard_stall(Pipeline_s* pipeline);
-//static bool compare_register(Pipeline_s* pipeline, uint16_t reg, uint16_t stage);
-static bool compare_register(Pipeline_s* pipeline, uint16_t reg);
-static bool check_registers_hazrads(Pipeline_s* pipeline, PipelineSM_e stage);
-static void (*pipe_functions[PIPELINE_SIZE])(Pipeline_s* pipeline) =
+static void fetch(Pipeline_s* pip);
+static void decode(Pipeline_s* pip);
+static void execute(Pipeline_s* pip);
+static void mem(Pipeline_s* pip);
+static void writeback(Pipeline_s* pip);
+static void start_pip_phases(Pipeline_s* pip);
+static void set_arguments_to_regs(Pipeline_s* pip, state_of_pipeline stage);
+static bool pipeline_needs_data_hazard_stall(Pipeline_s* pip);
+static bool compare_register(Pipeline_s* pip, uint16_t reg);
+static bool check_registers_hazrads(Pipeline_s* pip, state_of_pipeline stage);
+static void (*pipeline_functions_pointer[PIPELINE_SIZE])(Pipeline_s* pip) ={fetch, decode, execute, mem, writeback};
+static void update_statistics(Pipeline_s* pip);
+
+void initialize_pip(Pipeline_s* pip)
 {
-	fetch, decode, execute, mem, writeback
-};
-static void update_statistics(Pipeline_s* pipeline);
+	pip->is_pip_halt = false;
+	pip->is_data_stall = false;
+	pip->is_mem_stall = false;
+	pip->opcode_params.is_command_in_halt = &pip->is_pip_halt;
 
-/************************************
-*       API implementation          *
-************************************/
-
-/*!
-******************************************************************************
-\brief
-Init the pipeline.
-\param
- [in]  none
- [out] none
-\return none
-*****************************************************************************/
-void Pipeline_Init(Pipeline_s* pipeline)
-{
-	pipeline->halted = false;
-	pipeline->data_hazard_stall = false;
-	pipeline->memory_stall = false;
-
-	memset((uint8_t*)&pipeline->statistics, 0, sizeof(pipeline->statistics));
-	memset((uint8_t*)&pipeline->opcode_params, 0, sizeof(pipeline->opcode_params));
-	pipeline->opcode_params.halt = &pipeline->halted;
-
-	memset((uint8_t*)pipeline->pipe_stages, 0, sizeof(pipeline->pipe_stages));
-	for (int stage = FETCH; stage < PIPELINE_SIZE; stage++)
+	memset((uint8_t*)pip->pipe_stages, 0, sizeof(pip->pipe_stages));
+	for (int phase = FETCH; phase < PIPELINE_SIZE; phase++)
 	{
-		pipeline->pipe_stages[stage].state = stage;
-		pipeline->pipe_stages[stage].pc = MAX_INTEGER;
+		pip->pipe_stages[phase].state = phase;
+		pip->pipe_stages[phase].pc = MAX_INTEGER;
 	}
 
-	pipeline->pipe_stages[FETCH].pc = 0;
+	pip->pipe_stages[FETCH].pc = 0;
 }
 
-/*!
-******************************************************************************
-\brief
-One iteration of the pipeline. We will bubble the values inside the pipeline
-based on it's condition.
-\param
- [in]  none
- [out] none
-\return none
-*****************************************************************************/
-void Pipeline_Execute(Pipeline_s* pipeline)
+
+void Pipeline_Execute(Pipeline_s* pip)
 {
-	pipeline->data_hazard_stall = pipeline_needs_data_hazard_stall(pipeline);
-	execute_stages(pipeline);
-	update_statistics(pipeline);
+	pip->is_data_stall = pipeline_needs_data_hazard_stall(pip);
+	start_pip_phases(pip);
+	update_statistics(pip);
 }
 
-/*!
-******************************************************************************
-\brief
-The pipeline flushed all the stages.
-\param
- [in]  Pipeline_s *pipeline - Pointer to the relevant pipeline.
- [out] bool
-\return true if flushed, false otherwise.
-*****************************************************************************/
-bool Pipeline_PipeFlushed(Pipeline_s* pipeline)
+bool is_flush_require(Pipeline_s* pip, int phase) {
+	return (pip->pipe_stages[phase].pc == MAX_INTEGER);
+}
+bool flush_the_pipe(Pipeline_s* pip)
 {
-	bool flushed = pipeline->halted;
-	for (int stage = FETCH; stage < PIPELINE_SIZE; stage++)
+	bool res;
+	res = pip->is_pip_halt;
+	for (int phase = FETCH; phase < 5; phase++)
 	{
-		flushed &= (pipeline->pipe_stages[stage].pc == MAX_INTEGER);
+		res = res & (is_flush_require(pip, phase));
 	}
-
-	return flushed;
+	return res;
 }
 
-/*!
-******************************************************************************
-\brief
-Writing the pipeline to the trace file.
-\param
- [in]  Pipeline_s *pipeline - Pointer to the relevant pipeline.
- [in]  FILE *trace_file		- Pointer to trace file.
- [out] none
-\return none
-*****************************************************************************/
-void Pipeline_WriteToTrace(Pipeline_s* pipeline, FILE* trace_file)
+
+void tracing_pip(Pipeline_s* pip, FILE* trace_file)
 {
-	for (int stage = FETCH; stage < PIPELINE_SIZE; stage++)
+	for (int phase = FETCH; phase < 5; phase++)
 	{
-		if (pipeline->pipe_stages[stage].pc == MAX_INTEGER)
-			fprintf(trace_file, "--- ");
+		if (MAX_INTEGER == pip->pipe_stages[phase].pc)
+			fprintf(trace_file, "--- "); //this is the signs we asked to add
 		else
-			fprintf(trace_file, "%03X ", pipeline->pipe_stages[stage].pc);
+			fprintf(trace_file, "%03X ", pip->pipe_stages[phase].pc);
 	}
 }
 
-/*!
-******************************************************************************
-\brief
-Bubble the commands through the pipeline. Entering bubble where such thing
-is necessary.
-\param
- [in]  Pipeline_s *pipeline - Pointer to the relevant pipeline.
- [out] none
-\return none
-*****************************************************************************/
-void Pipeline_BubbleCommands(Pipeline_s* ppl)
+
+void add_idle_slot(Pipeline_s* ppl)
 {
-	/*
-	for (int stage = PIPELINE_SIZE - 1; stage > FETCH; stage--)
-	{
-		if (ppl->memory_stall)
-		{
-			pipeline->pipe_stages[WRITE_BACK].pc = UINT16_MAX;
-			break;
-		}
-		else if (pipeline->data_hazard_stall && stage == EXECUTE)
-		{
-			pipeline->pipe_stages[EXECUTE].pc = UINT16_MAX;
-			break;
-		}
-		else if (pipeline->pipe_stages[stage - 1].pc == UINT16_MAX)
-		{
-			pipeline->pipe_stages[stage].pc = UINT16_MAX;
-		}
-		else
-		{
-			pipeline->pipe_stages[stage].pc = pipeline->pipe_stages[stage - 1].pc;
-			pipeline->pipe_stages[stage].instruction.cmd =
-				pipeline->pipe_stages[stage - 1].instruction.cmd;
-			pipeline->pipe_stages[stage].operation = *pipeline->pipe_stages[stage - 1].operation;
-			pipeline->pipe_stages[stage].execute_result = pipeline->pipe_stages[stage - 1].execute_result;
-		}
-	}
-
-	if (pipeline->halted)
-	{
-		pipeline->pipe_stages[FETCH].pc = UINT16_MAX;
-		pipeline->pipe_stages[DECODE].pc = UINT16_MAX;
-	}
-	*/
-
-
+	
 	int current_stage = 4; // pipleline length - 1 
 	while (current_stage > 0) {
-		if (EXECUTE == current_stage && ppl->data_hazard_stall)
+		if (EXECUTE == current_stage && ppl->is_data_stall)
 		{
 			ppl->pipe_stages[EXECUTE].pc = MAX_INTEGER;
 			break;
 		}
-		else if (ppl->memory_stall)
+		else if (ppl->is_mem_stall)
 		{
 			ppl->pipe_stages[WRITE_BACK].pc = MAX_INTEGER;
 			break;
@@ -198,42 +93,11 @@ void Pipeline_BubbleCommands(Pipeline_s* ppl)
 			ppl->pipe_stages[current_stage].pc = ppl->pipe_stages[current_stage - 1].pc;
 			ppl->pipe_stages[current_stage].instruction = ppl->pipe_stages[current_stage - 1].instruction;
 			ppl->pipe_stages[current_stage].operation = *ppl->pipe_stages[current_stage - 1].operation;
-			ppl->pipe_stages[current_stage].execute_result = ppl->pipe_stages[current_stage - 1].execute_result;
+			ppl->pipe_stages[current_stage].execution_output = ppl->pipe_stages[current_stage - 1].execution_output;
 			current_stage -= 1;
 		}
-
-
-
-
 	}
-
-	/*
-	for (int current_stage = 4; current_stage > 0; current_stage--)
-	{
-		if (EXECUTE == current_stage && ppl->data_hazard_stall)
-		{
-			ppl->pipe_stages[EXECUTE].pc = UINT16_MAX;
-			break;
-		}
-		else if (ppl->memory_stall)
-		{
-			ppl->pipe_stages[WRITE_BACK].pc = UINT16_MAX;
-			break;
-		}
-		else if (ppl->pipe_stages[current_stage - 1].pc == UINT16_MAX)
-		{
-			ppl->pipe_stages[current_stage].pc = UINT16_MAX;
-		}
-		else
-		{
-			ppl->pipe_stages[current_stage].pc = ppl->pipe_stages[current_stage - 1].pc;
-			ppl->pipe_stages[current_stage].instruction = ppl->pipe_stages[current_stage - 1].instruction;
-			ppl->pipe_stages[current_stage].operation = *ppl->pipe_stages[current_stage - 1].operation;
-			ppl->pipe_stages[current_stage].execute_result = ppl->pipe_stages[current_stage - 1].execute_result;
-		}
-	}
-	*/
-	if (true == ppl->halted)
+	if (true == ppl->is_pip_halt)
 	{
 		ppl->pipe_stages[FETCH].pc = MAX_INTEGER;
 		ppl->pipe_stages[DECODE].pc = MAX_INTEGER;
@@ -242,190 +106,104 @@ void Pipeline_BubbleCommands(Pipeline_s* ppl)
 
 
 
-/************************************
-* static implementation             *
-************************************/
 
-/*!
-******************************************************************************
-\brief
-Fetch stage of the pipeline.
-\param
- [in]  Pipeline_s *pipeline - Pointer to the relevant pipeline.
- [out] none
-\return none
-*****************************************************************************/
 static void fetch(Pipeline_s* ppl)
 {
-	/*
-	if (pipeline->memory_stall)
-	{
-		return;
-	}
-	*/
-	if (false == ppl->memory_stall) {
+
+	if (false == ppl->is_mem_stall) {
 		ppl->pipe_stages[FETCH].pc = *(ppl->opcode_params.pc);
 		ppl->pipe_stages[FETCH].instruction = ppl->insturcionts_p[*(ppl->opcode_params.pc)];
-		if (!ppl->data_hazard_stall) {
+		if (!ppl->is_data_stall) {
 			uint16_t pc_tmp = *(ppl->opcode_params.pc) + 1;
 			*(ppl->opcode_params.pc) = pc_tmp;
 		}
 	}
-	/*
-	pipeline->pipe_stages[FETCH].pc = *(pipeline->opcode_params.pc);
-	pipeline->pipe_stages[FETCH].instruction = pipeline->insturcionts_p[*(pipeline->opcode_params.pc)];
-	if (!pipeline->data_hazard_stall) // Not in stall
-	{
-		*(pipeline->opcode_params.pc) += 1;
-	}
-	*/
 }
 
-/*!
-******************************************************************************
-\brief
-Decode stage of the pipeline.
-\param
- [in]  Pipeline_s *pipeline - Pointer to the relevant pipeline.
- [out] none
-\return none
-*****************************************************************************/
 static void decode(Pipeline_s* ppl)
 {
-	//uint16_t opcode = ppl->pipe_stages[DECODE].instruction.bits.opcode;
 	uint16_t code = get_command_opcode(ppl->pipe_stages[DECODE].instruction);
 	if (HALT == code)
 	{
-		ppl->halted = true;
+		ppl->is_pip_halt = true;
 		return;
 	}
-
-	ppl->pipe_stages[DECODE].operation = OpcodeMapping[code];
-
-	//if (Opcode_IsBranchResulotion(ppl->pipe_stages[DECODE].instruction.bits.code))
+	ppl->pipe_stages[DECODE].operation = *(opcode_command_function_pointer + code);
 	bool is_branch_taken; 
 	is_branch_taken = (BEQ <= code && LW > code);
 	if (is_branch_taken)
 	{
-		prepare_registers_params(ppl, DECODE);
+		set_arguments_to_regs(ppl, DECODE);
 		ppl->pipe_stages[DECODE].operation(&ppl->opcode_params);
 	}
 }
 
-/*!
-******************************************************************************
-\brief
-Execute stage of the pipeline.
-\param
- [in]  Pipeline_s *pipeline - Pointer to the relevant pipeline.
- [out] none
-\return none
-*****************************************************************************/
 static void execute(Pipeline_s* ppl)
 {
-	//uint16_t code = ppl->pipe_stages[EXECUTE].instruction.bits.code;
 	uint16_t code = get_command_opcode(ppl->pipe_stages[EXECUTE].instruction);
-	//if (!Opcode_IsBranchResulotion(code) && !Opcode_IsMemoryCommand(code) && code != HALT)
-	if (!(BEQ <= code && LW > code) && !(SW == code || LW == code) && HALT != code) //not branch not memory and not halt command
+	if (!(BEQ <= code && LW > code) && !(SW == code || LW == code) && HALT != code) 
 	{
-		prepare_registers_params(ppl, EXECUTE);
+		set_arguments_to_regs(ppl, EXECUTE);
 		ppl->pipe_stages[EXECUTE].operation(&ppl->opcode_params);
 	}
 }
 
-/*!
-******************************************************************************
-\brief
-Memory stage of the pipeline.
-\param
- [in]  Pipeline_s *pipeline - Pointer to the relevant pipeline.
- [out] none
-\return none
-*****************************************************************************/
 static void mem(Pipeline_s* ppl)
 {
-	//uint16_t opcode = ppl->pipe_stages[MEM].instruction.bits.opcode;
 	uint16_t code;
 	code = get_command_opcode(ppl->pipe_stages[MEM].instruction);
-	//if (Opcode_IsMemoryCommand(code))
 	if (code == LW || code == SW) //if this is a memory phase
 	{
 		bool is_data_in_cache;
-		prepare_registers_params(ppl, MEM);
+		set_arguments_to_regs(ppl, MEM);
 		uint32_t registers_address;
 		registers_address = ppl->opcode_params.rs + ppl->opcode_params.rt;
-
 		uint32_t* data_for_mem;
 		data_for_mem  = ppl->opcode_params.rd;
-		if (SW == code) is_data_in_cache = Cache_WriteData(&ppl->cache_data, registers_address, *data_for_mem);
-		else is_data_in_cache = Cache_ReadData(&ppl->cache_data, registers_address, data_for_mem);
+		if (SW == code) is_data_in_cache = Cache_WriteData(&ppl->current_data_from_cache, registers_address, *data_for_mem);
+		else is_data_in_cache = Cache_ReadData(&ppl->current_data_from_cache, registers_address, data_for_mem);
 		bool add_stall = !is_data_in_cache;
-		ppl->memory_stall = add_stall;
+		ppl->is_mem_stall = add_stall;
 	}
 }
 
-/*!
-******************************************************************************
-\brief
-Write back stage of the pipeline.
-\param
- [in]  Pipeline_s *pipeline - Pointer to the relevant pipeline.
- [out] none
-\return none
-*****************************************************************************/
 static void writeback(Pipeline_s* ppl)
 {
-	//inst instuction = { .cmd = pipeline->pipe_stages[WRITE_BACK].instruction.cmd };
-	uint32_t instruction = ppl->pipe_stages[WRITE_BACK].instruction;
+	uint32_t instruction;
+	instruction = ppl->pipe_stages[WRITE_BACK].instruction;
 	int index_for_jump;
 	if (JAL == get_command_opcode(instruction)) index_for_jump = NEXT_INSTRUCTION_ADDRESS_REGISTER;
 	else index_for_jump = get_command_rd(instruction);
-	ppl->core_registers_p[index_for_jump] = ppl->pipe_stages[WRITE_BACK].execute_result;
+	*(ppl->current_core_regs + index_for_jump) = ppl->pipe_stages[WRITE_BACK].execution_output;
 }
 
-/*!
-******************************************************************************
-\brief
-Preparing the parans struct for the operations functions.
-\param
- [in]  Pipeline_s *pipeline - Pointer to the relevant pipeline.
- [in]  PipelineSM_e stage - The pipeline stage this function is called.
- [out] none
-\return none
-*****************************************************************************/
-static void prepare_registers_params(Pipeline_s* ppl, PipelineSM_e ppl_phase)
+
+static void set_arguments_to_regs(Pipeline_s* ppl, state_of_pipeline ppl_phase)
 {
-	//inst instuction = { .cmd = pipeline->pipe_stages[stage].instruction.cmd };
 	uint32_t instruction;
 	instruction = ppl->pipe_stages[ppl_phase].instruction;
-	ppl->core_registers_p[REG_IMM] = get_command_immediate(instruction);
-	ppl->pipe_stages[ppl_phase].execute_result = ppl->core_registers_p[get_command_rd(instruction)];
-	ppl->opcode_params.rs = ppl->core_registers_p[get_command_rs(instruction)];
-	ppl->opcode_params.rt = ppl->core_registers_p[get_command_rt(instruction)];
-	ppl->opcode_params.rd = &ppl->pipe_stages[ppl_phase].execute_result;
+	*(ppl->current_core_regs +REG_IMM) = get_command_immediate(instruction);
+	current_pipeline_information* current_info;
+	current_info = ppl->pipe_stages;
+	(current_info + ppl_phase)->execution_output = ppl->current_core_regs[get_command_rd(instruction)];
+	ppl->opcode_params.rs = ppl->current_core_regs[get_command_rs(instruction)];
+	ppl->opcode_params.rt = ppl->current_core_regs[get_command_rt(instruction)];
+	ppl->opcode_params.rd = &ppl->pipe_stages[ppl_phase].execution_output;
 }
 
-/*!
-******************************************************************************
-\brief
-Executing the pipeline.
-\param
- [in]  Pipeline_s *pipeline - Pointer to the relevant pipeline.
- [out] none
-\return none
-*****************************************************************************/
-static void execute_stages(Pipeline_s* pipeline)
-{
-	uint8_t stage = pipeline->memory_stall ? MEM : pipeline->data_hazard_stall ? EXECUTE : DECODE;
-	if (!pipeline->halted)
-		pipe_functions[FETCH](pipeline);
 
-	for (; stage < PIPELINE_SIZE; stage++)
+static void start_pip_phases(Pipeline_s* pip)
+{
+	uint16_t phase;
+	if (pip->is_mem_stall) phase = MEM;
+	else if (pip->is_data_stall) phase = EXECUTE;
+	else phase = DECODE;
+	if (!pip->is_pip_halt)
+		pipeline_functions_pointer[FETCH](pip);
+
+	for (phase; phase < PIPELINE_SIZE; phase++)
 	{
-		if (!(pipeline->pipe_stages[stage].pc == MAX_INTEGER))
-		{
-			pipe_functions[stage](pipeline);
-		}
+		if (!(is_flush_require(pip, phase))) pipeline_functions_pointer[phase](pip);
 	}
 }
 
@@ -441,11 +219,11 @@ Comparing between the registers of certain stage and the rd register.
 \return true if found two identical registed index, false otherwise.
 *****************************************************************************/
 //static bool compare_register(Pipeline_s* pipeline, uint16_t reg, uint16_t stage)
-static bool compare_register(Pipeline_s* pipeline, uint16_t reg, uint16_t stage)
+static bool compare_register(Pipeline_s* pip, uint16_t reg)
 {
 	bool ret = false;
-	uint32_t decode_ins = pipeline->pipe_stages[DECODE].instruction;
-	uint16_t op_write_back = get_command_opcode(pipeline->pipe_stages[WRITE_BACK].instruction);
+	uint32_t decode_ins = pip->pipe_stages[DECODE].instruction;
+	uint16_t op_write_back = get_command_opcode(pip->pipe_stages[WRITE_BACK].instruction);
 	uint16_t rs, rd, rt, opcode;
 	rs = get_command_rs(decode_ins);
 	rt = get_command_rt(decode_ins);
@@ -479,15 +257,15 @@ Checking registers data hazards.
  [out] bool
 \return true if found data hazard, false otherwise.
 *****************************************************************************/
-static bool check_registers_hazrads(Pipeline_s* pipeline, PipelineSM_e stage)
+static bool check_registers_hazrads(Pipeline_s* pip, state_of_pipeline stage)
 {
-	if (pipeline->pipe_stages[stage].pc == MAX_INTEGER)
+	if (pip->pipe_stages[stage].pc == MAX_INTEGER)
 	{
 		return false;
 	}
 	//return compare_register(pipeline, pipeline->pipe_stages[stage].instruction.bits.rd, stage);
 	//return compare_register(pipeline, pipeline->pipe_stages[stage].instruction.bits.rd);
-	return compare_register(pipeline, get_command_rd(pipeline->pipe_stages[stage].instruction), stage);
+	return compare_register(pip, get_command_rd(pip->pipe_stages[stage].instruction));
 }
 
 /*!
@@ -499,10 +277,10 @@ Checking if pipeline needs data hazard.
  [out] bool
 \return true pipeline in data hazard, false otherwise.
 *****************************************************************************/
-static bool pipeline_needs_data_hazard_stall(Pipeline_s* pipeline)
+static bool pipeline_needs_data_hazard_stall(Pipeline_s* pip)
 {
-	return check_registers_hazrads(pipeline, EXECUTE) || check_registers_hazrads(pipeline, WRITE_BACK) ||
-		check_registers_hazrads(pipeline, MEM);
+	return check_registers_hazrads(pip, EXECUTE) || check_registers_hazrads(pip, WRITE_BACK) ||
+		check_registers_hazrads(pip, MEM);
 }
 
 /*!
@@ -513,11 +291,11 @@ Updating staistics struct.
  [in] core - the operating core.
 \return none
 *****************************************************************************/
-static void update_statistics(Pipeline_s* pipeline)
+static void update_statistics(Pipeline_s* pip)
 {
-	if (pipeline->data_hazard_stall && !pipeline->memory_stall)
-		pipeline->statistics.decode_stalls++;
+	if (pip->is_data_stall && !pip->is_mem_stall)
+		pip->current_pip_decode_stalls++;
 
-	if (pipeline->memory_stall)
-		pipeline->statistics.mem_stalls++;
+	if (pip->is_mem_stall)
+		pip->current_pip_memory_stalls++;
 }

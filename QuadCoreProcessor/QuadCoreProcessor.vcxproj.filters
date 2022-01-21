@@ -21,9 +21,6 @@
     <ClCompile Include="core.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="opcode.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="pipline.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -45,9 +42,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="core.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="opcode.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="pipline.h">
