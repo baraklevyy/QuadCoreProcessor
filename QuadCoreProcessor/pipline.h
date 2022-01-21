@@ -52,7 +52,7 @@ typedef struct
 void Pipeline_Init(Pipeline_s* pipeline);
 void Pipeline_Execute(Pipeline_s* pipeline);
 void Pipeline_WriteToTrace(Pipeline_s* pipeline, FILE* trace_file);
-bool reg_compare_logic(uint32_t instruction, uint16_t reg, uint16_t op_code);
+bool reg_compare_logic(uint32_t instruction, uint16_t reg, uint16_t op_code, uint16_t op_write__back);
 bool reg_compare_helper(uint16_t reg1, uint16_t reg2);
 void Pipeline_BubbleCommands(Pipeline_s* pipeline);
 bool Pipeline_PipeFlushed(Pipeline_s* pipeline);

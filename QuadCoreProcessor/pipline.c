@@ -445,36 +445,21 @@ static bool compare_register(Pipeline_s* pipeline, uint16_t reg, uint16_t stage)
 {
 	bool ret = false;
 	uint32_t decode_ins = pipeline->pipe_stages[DECODE].instruction;
-	uint16_t op = get_command_opcode(pipeline->pipe_stages[WRITE_BACK].instruction);
+	uint16_t op_write_back = get_command_opcode(pipeline->pipe_stages[WRITE_BACK].instruction);
 	uint16_t rs, rd, rt, opcode;
 	rs = get_command_rs(decode_ins);
 	rt = get_command_rt(decode_ins);
 	rd = get_command_rd(decode_ins);
 	opcode = get_command_opcode(decode_ins);
-
-
-	if (reg == REG_IMM || reg == REG_ZERO)
-	{
-		ret = false;
-	}
-	else if (opcode <= SRL || opcode == LW ||
-		(opcode == SW && op == SW))
-	{
-		ret = (reg == rs || reg == rt);
-	}
-	else
-	{
-		ret = (reg == rd || reg == rs || reg == rt);
-	}
-
-	return ret;
+	return(reg_compare_logic(decode_ins, reg, opcode, op_write_back));
 }
-bool reg_compare_logic(uint32_t instruction, uint16_t reg, uint16_t op_code) {
-	if (get_command_opcode(instruction) == LW || get_command_opcode(instruction) <= SRL || (get_command_opcode(instruction) == SW && SW == op_code))
 
+bool reg_compare_logic(uint32_t instruction, uint16_t reg, uint16_t op_code, uint16_t op_write_back) {
+	if (reg == REG_IMM || reg == REG_ZERO) return false;
+	if (get_command_opcode(instruction) == LW || get_command_opcode(instruction) <= SRL || ((get_command_opcode(instruction) == SW && SW == op_write_back)))
 		return (reg_compare_helper(reg, get_command_rs(instruction)) || reg_compare_helper(reg, get_command_rt(instruction)));
 
-	if (reg == REG_IMM || reg == REG_ZERO) return false;
+	
 	//otherwise we have to return
 	return (reg == get_command_rd(instruction) || reg == get_command_rs(instruction) || reg == get_command_rt(instruction));
 }
