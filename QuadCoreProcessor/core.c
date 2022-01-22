@@ -1,245 +1,52 @@
-/*!
-******************************************************************************
-\file Core.c
-\date 26 October 2021
-\author Rony Kositsky & Ofir Guthman & Yonatan Gartenberg
-\brief
-\details
-\par Copyright
-(c) Copyright 2021 Ofir & Rony & Yonatan
-\par
-ALL RIGHTS RESERVED
-*****************************************************************************/
-
-/************************************
-*      include                      *
-************************************/
 #define _CRT_SECURE_NO_WARNINGS
 #include "core.h"
 #include <stdio.h>
 #include <string.h>
+static void fill_regs_files(data_of_core* core, uint32_t* regs_copy);
+bool pipeline_is_legal(data_of_core* core);
 
-/************************************
-*      definitions                 *
-************************************/
-#define INSTRUCTION_COUNT 0
-
-/************************************
-*      variables                    *
-************************************/
-
-/************************************
-*      static functions             *
-************************************/
-static int init_memory(Core_s* core);
-static void write_trace(Core_s* core, uint32_t* registers);
-static void write_regs_to_file(Core_s* core, uint32_t* regs_copy);
-static void update_statistics(Core_s* core);
-static void print_register_file(Core_s* core);
-static void print_statistics(Core_s* core);
-
-/************************************
-*       API implementation          *
-************************************/
-
-/*!
-******************************************************************************
-\brief
-Init the core.
-\details
-Called at the start of the run.
-\param
- [in] core - the operating core
-\return none
-*****************************************************************************/
-void Core_Init(Core_s* core, uint8_t id)
-{
-	memset(&core->register_array, 0, sizeof(NUMBER_OF_REGISTERS));
-	int number_of_lines = init_memory(core);
-	if (!number_of_lines)
-	{
-		core->core_halted = true;
+void initialize_core(data_of_core* core, uint8_t id){
+	int number_of_lines = 0;
+	while (number_of_lines < SIZE_OF_INST && fscanf(core->core_files.immediate_memory_file, "%08x", (uint32_t*)&(core->data_of_instruction[number_of_lines])) != -1) number_of_lines = number_of_lines + 1;
+	if (0 == number_of_lines){
+		core->is_core_terminated = true;
 		return;
 	}
-
-	core->program_counter = 0;
 	core->index = id;
-	core->core_halted = false;
-
-	memset(&core->statistics, 0, sizeof(Statistics_s));
-	core->statistics.cycles = -1; 
-
-	memset(&core->pipeline, 0, sizeof(pipe_data));
+	core->pc_of_core = 0;
+	core->is_core_terminated = false;
+	core->number_of_cycles = core->number_of_cycles - 1;
 	initialize_pip(&core->pipeline);
-
-	memset(&core->pipeline.current_data_from_cache, 0, sizeof(cache_information));
 	initialize_the_cache(&core->pipeline.current_data_from_cache, id);
-
-	set_cache_snoop_function();
 	set_cache_answer();
+	set_cache_snoop_function();
 	set_cache_shared_func();
-
-	core->pipeline.current_core_regs = core->register_array;
-	core->pipeline.pointer_to_instruction = core->instructions_memory_image;
-	core->pipeline.opcode_params.pc = &(core->program_counter);
+	core->pipeline.pointer_to_instruction = core->data_of_instruction;
+	core->pipeline.current_core_regs = core->data_register;
+	core->pipeline.opcode_params.pc = &(core->pc_of_core);
 }
-
-/*!
-******************************************************************************
-\brief
-Run core iteration
-\details
-core is running with pipeline.
-\param
- [in] core - the operating core
-\return none
-*****************************************************************************/
-void Core_Iter(Core_s* core)
-{
-	if (core->core_halted)
-	{
+bool pipeline_is_legal(data_of_core* core) {
+	return (!core->pipeline.is_pip_halt && !core->pipeline.is_mem_stall && !core->pipeline.is_data_stall);
+}
+void operate_the_core(data_of_core* core){
+	if (true == core->is_core_terminated) return;
+	if (true == flush_the_pipe(&core->pipeline)){
+		core->is_core_terminated = true;
 		return;
 	}
-
-	if (flush_the_pipe(&core->pipeline))
-	{
-		core->core_halted = true;
-		return;
-	}
-
 	uint32_t regs_copy[NUMBER_OF_REGISTERS];
-	memcpy(regs_copy, core->register_array, sizeof(core->register_array));
-
-	update_statistics(core);
+	memcpy(regs_copy, core->data_register, sizeof(core->data_register));
+	core->number_of_cycles = core->number_of_cycles + 1;
+	if (pipeline_is_legal(core)) core->number_of_instructions = core->number_of_instructions + 1;
 	set_pip(&core->pipeline, core->index);
-	write_trace(core, regs_copy);
+	fprintf(core->core_files.core_trace_files, "%d ", core->number_of_cycles);
+	tracing_pip(&core->pipeline, core->core_files.core_trace_files);
+	fill_regs_files(core, regs_copy);
+	fprintf(core->core_files.core_trace_files, "\n");
 	add_idle_slot(&core->pipeline);
 }
-
-/*!
-******************************************************************************
-\brief
-Teardown of the code.
-\param
- [in] core - the operating core
-\return none
-*****************************************************************************/
-void Core_Teaddown(Core_s* core)
-{
-	print_register_file(core);
-	cache_print_to_file(&core->pipeline.current_data_from_cache,
-		core->core_files.dsram_F, core->core_files.TsRamFile);
-	print_statistics(core);
-}
-
-/*!
-******************************************************************************
-\brief
-If the core is halted.
-\param
- [in] core - the operating core
- [out] bool
-\return true if core is halted, fale otherwise.
-*****************************************************************************/
-bool Core_Halted(Core_s* core)
-{
-	return core->core_halted;
-}
-
-
-/************************************
-* static implementation             *
-************************************/
-
-/*!
-******************************************************************************
-\brief
-Init the core instructions memory.
-\param
- [in] core - the operating core
-\return number of memory lines
-*****************************************************************************/
-static int init_memory(Core_s* core)
-{
-	int number_of_lines = 0;
-	while (number_of_lines < SIZE_OF_INST && fscanf(core->core_files.imem_F,
-		"%08x", (uint32_t*)&(core->instructions_memory_image[number_of_lines])) != EOF)
-	{
-		number_of_lines++;
+static void fill_regs_files(data_of_core* core, uint32_t* regs_copy){
+	for (int i = 2; i < NUMBER_OF_REGISTERS; i++){
+		fprintf(core->core_files.core_trace_files, "%08X ", *(regs_copy + i));
 	}
-
-	return number_of_lines;
-}
-
-
-static void write_trace(Core_s* core, uint32_t* registers)
-{
-	fprintf(core->core_files.core_trace_F, "%d ", core->statistics.cycles);
-	tracing_pip(&core->pipeline, core->core_files.core_trace_F);
-	write_regs_to_file(core, registers);
-	fprintf(core->core_files.core_trace_F, "\n");
-
-}
-
-/*!
-******************************************************************************
-\brief
-Writing the registers to file.
-\param
- [in] core				  - the operating core.
- [in] uint32_t *regs_copy - pointer to the regs copied values.
-\return none
-*****************************************************************************/
-static void write_regs_to_file(Core_s* core, uint32_t* regs_copy)
-{
-	//first two registers are not for write
-	for (int i = 2; i < NUMBER_OF_REGISTERS; i++)
-	{
-		fprintf(core->core_files.core_trace_F, "%08X ", regs_copy[i]);
-	}
-}
-
-/*!
-******************************************************************************
-\brief
-Updating staistics struct.
-\param
- [in] core - the operating core.
-\return none
-*****************************************************************************/
-static void update_statistics(Core_s* core)
-{
-	core->statistics.cycles++;
-
-	if (!core->pipeline.is_pip_halt && !core->pipeline.is_mem_stall && !core->pipeline.is_data_stall)
-		core->statistics.instructions++;
-}
-
-/*!
-******************************************************************************
-\brief
-Printing the registers file.
-\param
- [in] core - the operating core.
-\return none
-*****************************************************************************/
-static void print_register_file(Core_s* core)
-{
-	//first two registers arent for printing
-	for (int i = 2; i < NUMBER_OF_REGISTERS; i++)
-	{
-		fprintf(core->core_files.regout_F, "%08X\n", core->register_array[i]);
-	}
-}
-
-static void print_statistics(Core_s* core)
-{
-	fprintf(core->core_files.StatsFile, "cycles %d\n", core->statistics.cycles + 1);
-	fprintf(core->core_files.StatsFile, "instructions %d\n", core->statistics.instructions - 1);
-	fprintf(core->core_files.StatsFile, "read_hit %d\n", core->pipeline.current_data_from_cache.number_of_read_hit);
-	fprintf(core->core_files.StatsFile, "write_hit %d\n", core->pipeline.current_data_from_cache.number_of_write_hit);
-	fprintf(core->core_files.StatsFile, "read_miss %d\n", core->pipeline.current_data_from_cache.number_of_read_miss);
-	fprintf(core->core_files.StatsFile, "write_miss %d\n", core->pipeline.current_data_from_cache.number_of_write_miss);
-	fprintf(core->core_files.StatsFile, "decode_stall %d\n", core->pipeline.current_pip_decode_stalls);
-	fprintf(core->core_files.StatsFile, "mem_stall %d\n", core->pipeline.current_pip_memory_stalls);
 }

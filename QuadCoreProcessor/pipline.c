@@ -255,19 +255,14 @@ static void update_statistics(pipe_data* pip)
 	if (pip->is_mem_stall) pip->current_pip_memory_stalls++;
 
 }
-void initialize_pip(pipe_data* pip)
-{
+void initialize_pip(pipe_data* pip){
 	pip->is_pip_halt = false;
 	pip->is_data_stall = false;
 	pip->is_mem_stall = false;
 	pip->opcode_params.is_command_in_halt = &pip->is_pip_halt;
-
-
-	for (int phase = FETCH; phase < PIPELINE_SIZE; phase++)
-	{
-		pip->pipe_stages[phase].state = phase;
+	for (int phase = FETCH; phase < PIPELINE_SIZE; phase++){
 		pip->pipe_stages[phase].pc = MAX_INTEGER;
+		pip->pipe_stages[phase].state = phase;
 	}
-
 	pip->pipe_stages[FETCH].pc = 0;
 }

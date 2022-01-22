@@ -11,19 +11,7 @@ typedef mesi_state(*get_mesi_block_state_from_bus_snoop)(cache_information* data
 void operate_dirty_block(cache_information* data, uint32_t addr);
 get_mesi_block_state_from_bus_snoop from_what_mesi_state_operate[4] = {current_invalid_state, current_shared_state, current_exclusive_state, current_modified_state};
 
-/// <summary>
-/// data read from cache
-/// </summary>
-/// <param name="cache_data"></param>
-/// <param name="address"></param>
-/// <param name="data"></param>
-/// <returns>success if read succeed, fail otherwise</returns>
 
-/// <summary>
-/// setting up the cache
-/// </summary>
-/// <param name="data"></param>
-/// <param name="id"></param>
 void initialize_the_cache(cache_information* data, core_identifier id){
 	data->id = id;
 	communication_of_bus_cache_info cache_communication_bus;

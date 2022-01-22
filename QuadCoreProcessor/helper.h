@@ -14,6 +14,7 @@
 #define REG_IMM 1
 #define NEXT_INSTRUCTION_ADDRESS_REGISTER 15
 #define CORES_NUMBER 4
+#define SIZE_OF_INST 1024
 #define CACHE_SIZE	256
 #define BLOCK_SIZE	4
 #define TSRAM_NUMBER_OF_LINES 64
@@ -33,13 +34,14 @@ typedef struct
 
 typedef struct
 	{
-		FILE* imem_F;
-		FILE* regout_F;
-		FILE* core_trace_F;
-		FILE* dsram_F;
-		FILE* TsRamFile;
-		FILE* StatsFile;
-	} output_core_file;
+		FILE* immediate_memory_file;
+		FILE* register_out_files;
+		FILE* core_trace_files;
+		FILE* dsram_files;
+		FILE* tsram_files;
+		FILE* statistics_files;
+	} current_core_data_files;
+
 
 
 typedef struct
@@ -59,7 +61,7 @@ typedef struct
 
 
 
-extern output_core_file files_of_cores[CORES_NUMBER];
+extern current_core_data_files files_of_cores[CORES_NUMBER];
 FILE* MeminFile;
 FILE* MemoutFile;
 FILE* BusTraceFile;
@@ -224,6 +226,7 @@ void set_cache_snoop_function(void);
 exit_func_code read_from_cache(cache_information* cache_data, uint32_t address, uint32_t* data);
 exit_func_code write_to_cache(cache_information* cache_data, uint32_t address, uint32_t data);
 void cache_print_to_file(cache_information* cache_data, FILE* dsram_f, FILE* tsram_f);
+
 
 
 
