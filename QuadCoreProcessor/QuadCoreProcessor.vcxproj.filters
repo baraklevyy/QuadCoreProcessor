@@ -27,9 +27,6 @@
     <ClCompile Include="bus.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="mainMemory.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="main.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -45,9 +42,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="helper.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="mainMemory.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

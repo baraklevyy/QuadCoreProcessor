@@ -144,13 +144,11 @@
     <ClCompile Include="core.c" />
     <ClCompile Include="helper.c" />
     <ClCompile Include="main.c" />
-    <ClCompile Include="mainMemory.c" />
     <ClCompile Include="pipline.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="core.h" />
     <ClInclude Include="helper.h" />
-    <ClInclude Include="mainMemory.h" />
     <ClInclude Include="pipline.h" />
   </ItemGroup>
   <ItemGroup>

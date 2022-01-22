@@ -194,7 +194,7 @@ static bool is_cache_snooping(data_on_bus* data)
 /// </summary>
 /// <param name="data"></param>
 static void bus_information_print(data_on_bus data){
-	fprintf(BusTraceFile, "%d %d %d %05X %08X %d\n", total_number_of_iterations, data.origid_on_bus, data.command_on_bus, data.address_on_bus, data.data_on_bus, data.is_bus_shared);
+	fprintf(bus_trace_file, "%d %d %d %05X %08X %d\n", total_number_of_iterations, data.origid_on_bus, data.command_on_bus, data.address_on_bus, data.data_on_bus, data.is_bus_shared);
 }
 
 void set_cache_shared_function(shared_function_pointer shared) {

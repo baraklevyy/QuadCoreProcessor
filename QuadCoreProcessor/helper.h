@@ -62,9 +62,9 @@ typedef struct
 
 
 extern current_core_data_files files_of_cores[CORES_NUMBER];
-FILE* MeminFile;
-FILE* MemoutFile;
-FILE* BusTraceFile;
+FILE* memory_input_file;
+FILE* memory_output_file;
+FILE* bus_trace_file;
 
 enum core_E{core0=0, core1, core2, core3};
 enum file_names_E{ imem0 = 1, imem1 , imem2, imem3,
