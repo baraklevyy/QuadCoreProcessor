@@ -43,7 +43,7 @@ exit_func_code read_from_cache(cache_information* cache_data, uint32_t address, 
 		index = (BLOCK_SIZE) * (get_cache_address_index(addr)) + get_cache_address_offset(addr);
 		*data = cache_data->dsram[index];
 		if (false == data_is_missing) cache_data->number_of_read_hit = cache_data->number_of_read_hit + 1; //flag should stay false since we had hit
-		else data_is_missing = !data_is_missing;//previous op was miss, now we change the flag since we had hit
+		else data_is_missing = false;//previous op was miss, now we change the flag since we had hit
 		return success_op;
 	}
 	//this is not a hit, so we have miss on the data from cache
@@ -73,7 +73,7 @@ exit_func_code write_to_cache(cache_information* cache_data, uint32_t address, u
 	addr = address;
 	uint32_t* tsram;
 	tsram = &(cache_data->tsram[get_cache_address_index(addr)]);
-	if (get_tsram_tag(*tsram) == get_cache_address_tag(addr) && get_tsram_mesi_state(*tsram) != invalid){ //check for equalitiy of tags and not invalid state - check for hit
+	if (get_tsram_tag(*tsram) == get_cache_address_tag(addr) && get_tsram_mesi_state(*tsram) != invalid) { //check for equalitiy of tags and not invalid state - check for hit
 		if (shared != get_tsram_mesi_state(*tsram)) { //hit and no shared data
 			if (false == data_is_missing) cache_data->number_of_write_hit = cache_data->number_of_write_hit + 1;//we have write hit and the block is exclusive, so we can just change it
 			else data_is_missing = false;
@@ -85,7 +85,7 @@ exit_func_code write_to_cache(cache_information* cache_data, uint32_t address, u
 			cache_data->tsram[get_cache_address_index(addr)] = temp;
 			return success_op;
 		}
-		if (shared == get_tsram_mesi_state(*tsram)){ //if the block is shared we need to implement bus_read transaction on the bus, also dealing it as a data miss
+		if (shared == get_tsram_mesi_state(*tsram)) { //if the block is shared we need to implement bus_read transaction on the bus, also dealing it as a data miss
 			data_is_missing = true;
 			cache_data->number_of_write_miss = cache_data->number_of_write_miss + 1;
 			//push bus_read_exclusive since we are writing new data
@@ -133,21 +133,36 @@ mesi_state current_shared_state(cache_information* data, data_on_bus* data_conta
 	return shared;
 }
 mesi_state current_exclusive_state(cache_information* data, data_on_bus* data_container_from_bus){
+	
 	if (data_container_from_bus->command_on_bus == bus_read_cmd_on_bus) return shared;
 	if (data_container_from_bus->command_on_bus == bus_read_exclusive_cmd_on_bus) return invalid;
 	return exclusive;
 }
-mesi_state current_modified_state(cache_information* data, data_on_bus* data_container_from_bus){
-	uint32_t address = data_container_from_bus->address_on_bus;
-	uint16_t index = (uint16_t*)(get_cache_address_index(address) * BLOCK_SIZE + get_cache_address_offset(address));
-	if (data_container_from_bus->command_on_bus == bus_read_cmd_on_bus || data_container_from_bus->command_on_bus == bus_read_exclusive_cmd_on_bus || data_container_from_bus->command_on_bus == bus_flush_cmd_on_bus){
+mesi_state current_modified_state(cache_information* data, data_on_bus* data_container_from_bus) {
+	uint32_t address;
+	address = data_container_from_bus->address_on_bus;
+	uint16_t ind;
+	ind = (uint16_t*)(get_cache_address_index(address) * BLOCK_SIZE + get_cache_address_offset(address));
+	if (data_container_from_bus->command_on_bus == bus_read_cmd_on_bus){
+		data_container_from_bus->data_on_bus = data->dsram[ind];
 		data_container_from_bus->command_on_bus = bus_flush_cmd_on_bus;
-		data_container_from_bus->data_on_bus = data->dsram[index];
 		data_container_from_bus->origid_on_bus = data->id;
-		mesi_state next_state = data_container_from_bus->command_on_bus == bus_read_cmd_on_bus ? shared : data_container_from_bus->command_on_bus == bus_read_exclusive_cmd_on_bus ? invalid : modified;
-		return next_state;
+		return shared;
+	}
+	else if (data_container_from_bus->command_on_bus == bus_read_exclusive_cmd_on_bus){
+		data_container_from_bus->origid_on_bus = data->id;
+		data_container_from_bus->command_on_bus = bus_flush_cmd_on_bus;
+		data_container_from_bus->data_on_bus = data->dsram[ind];
+		return invalid;
+	}
+	else if (data_container_from_bus->command_on_bus == bus_flush_cmd_on_bus){
+		data_container_from_bus->data_on_bus = data->dsram[ind];
+		data_container_from_bus->command_on_bus = bus_flush_cmd_on_bus;
+		data_container_from_bus->origid_on_bus = data->id;
+		return modified;
 	}
 }
+
 bool shared_block_check(cache_information* data, data_on_bus* data_container_from_bus, bool* changed){
 	if (data->id == data_container_from_bus->origid_on_bus) return false; //if this is a self-data
 	uint32_t address = data_container_from_bus->address_on_bus;
@@ -179,13 +194,13 @@ bool check_existance_of_block(cache_information* data, data_on_bus* data_contain
 	uint32_t* tsram = &(data->tsram[get_cache_address_index(address)]);
 	if (get_tsram_tag(*tsram) != get_cache_address_tag(address) || get_tsram_mesi_state(*tsram) == invalid) return false; //the block is not in cache
 	mesi_state next_state = from_what_mesi_state_operate[get_tsram_mesi_state(*tsram)](data, data_container_from_bus); //changing the state of block regarding the MESI algorithm
-	if ((BLOCK_SIZE - 1) == address_offset || get_tsram_mesi_state(*tsram) != modified) set_mesi_state_to_tsram(tsram, (uint16_t*)next_state);
+	if (address_offset == (BLOCK_SIZE - 1) || get_tsram_mesi_state(*tsram) != modified) set_mesi_state_to_tsram(tsram, (uint16_t*)next_state);
 	return true;
 }
 static bool cache_data_answer(cache_information* data, data_on_bus* data_container_from_bus, uint8_t* address_offset){
 	if (data->id == data_container_from_bus->origid_on_bus && data_container_from_bus->command_on_bus != bus_flush_cmd_on_bus) return false; //self data
 	else if (data->id == data_container_from_bus->origid_on_bus && data_container_from_bus->command_on_bus == bus_flush_cmd_on_bus){
-		if ((BLOCK_SIZE - 1)  == *address_offset) return true;
+		if (*address_offset == (BLOCK_SIZE - 1)) return true;
 		*address_offset += 1;
 		return false;
 	}
@@ -196,7 +211,7 @@ static bool cache_data_answer(cache_information* data, data_on_bus* data_contain
 		uint16_t index = (uint16_t*)(get_cache_address_index(address) * BLOCK_SIZE + get_cache_address_offset(address));
 		data->dsram[index] = data_container_from_bus->data_on_bus;
 	}
-	if ((BLOCK_SIZE - 1)  == *address_offset){
+	if (*address_offset == (BLOCK_SIZE - 1)) {
 		if (true == data_container_from_bus->is_bus_shared) set_mesi_state_to_tsram(tsram, (uint16_t*)shared);
 		else set_mesi_state_to_tsram(tsram, (uint16_t*)exclusive);
 		return true;
