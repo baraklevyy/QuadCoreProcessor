@@ -23,7 +23,7 @@ typedef struct
 	uint32_t register_array[NUMBER_OF_REGISTERS];
 	uint32_t instructions_memory_image[SIZE_OF_INST];
 	output_core_file core_files;
-	Pipeline_s pipeline;
+	pipe_data pipeline;
 	Statistics_s statistics;
 }Core_s;
 

@@ -3,6 +3,7 @@
 #include "mainMemory.h"
 #include "bus.h"
 #include <string.h>
+#include "helper.h"
 
 
 static Core_s cores[CORES_NUMBER];
@@ -38,7 +39,7 @@ int main(int argc, char* argv[])
 
 	while(!cores[0].core_halted || !cores[1].core_halted || !cores[2].core_halted || !cores[3].core_halted)
 	{
-		Bus_Iter();
+		operate_bus();
 		for (int core = 0; core < CORES_NUMBER; core++)
 		{
 			Core_Iter(&cores[core]);

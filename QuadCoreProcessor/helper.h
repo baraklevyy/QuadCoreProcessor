@@ -1,15 +1,4 @@
-/*!
-******************************************************************************
-\file file_name.h
-\date 17 October 2021
-\author Rony Kosistky & Ofir Guthman & Yonatan Gartenberg
-\brief
-\details
-\par Copyright
-(c) Copyright 2021 Ofir & Rony & Yonatan Gartenberg
-\par
-ALL RIGHTS RESERVED
-*****************************************************************************/
+
 
 #ifndef __HELPERS_H__
 #define __HELPERS_H__
@@ -29,26 +18,9 @@ ALL RIGHTS RESERVED
 #define BLOCK_SIZE	4
 #define TSRAM_NUMBER_OF_LINES 64
 #define PIPELINE_SIZE 5
+
 #define _CSECURE_NO_WARNINGS
 
-/************************************
-*       types                       *
-************************************/
-/*
-typedef union
-{
-	struct
-	{
-		uint16_t immediate : 12;
-		uint16_t rt : 4;		
-		uint16_t rs : 4;		
-		uint16_t rd : 4;		
-		uint16_t opcode : 8;	
-	} bits;
-
-	uint32_t cmd;
-} inst;
-*/
 
 typedef struct
 {
@@ -58,30 +30,7 @@ typedef struct
 } memory_addess_s;
 
 
-/*
-typedef struct
-{
-	uint32_t data;
 
-	struct
-	{
-		uint16_t tag : 12;	// [0:11]
-		uint16_t mesi : 2;	// [12:13]
-	}fields;
-} Tsram_s;
-*/
-/*
-typedef struct
-{
-	uint32_t read_hits;
-	uint32_t write_hits;
-	uint32_t read_misses;
-	uint32_t write_misses;
-} CacheStatistics_s;
-*/
-
-
-/*File declarations*/
 typedef struct
 	{
 		FILE* imem_F;
@@ -92,37 +41,6 @@ typedef struct
 		FILE* StatsFile;
 	} output_core_file;
 
-/*
-typedef struct
-{
-	core_identifier id;
-	bool memory_stall;
-	uint32_t dsram[CACHE_SIZE];
-	//Tsram_s tsram[TSRAM_NUMBER_OF_LINES];
-	uint32_t tsram[TSRAM_NUMBER_OF_LINES];
-	CacheStatistics_s statistics;
-} cache_information;
-*/
-/*
-typedef struct
-{
-	uint32_t read_hits;
-	uint32_t write_hits;
-	uint32_t read_misses;
-	uint32_t write_misses;
-} CacheStatistics_s;
-
-
-typedef struct
-{
-	core_identifier id;
-	bool memory_stall;
-	uint32_t dsram[CACHE_SIZE];
-	//Tsram_s tsram[TSRAM_NUMBER_OF_LINES];
-	uint32_t tsram[TSRAM_NUMBER_OF_LINES];
-	CacheStatistics_s statistics;
-} cache_information;
-*/
 
 typedef struct
 {
@@ -132,6 +50,7 @@ typedef struct
 	uint32_t* rd;
 	uint32_t rt;
 }parameters_to_command;
+
 
 
 
@@ -154,9 +73,57 @@ enum file_names_E{ imem0 = 1, imem1 , imem2, imem3,
 	tsram0, tsram1, tsram2, tsram3,
 	stats0, stats1, stats2, stats3};
 
-typedef enum{invalid=0, shared, exclusive, modified} mesi_state;
-typedef enum{CORE0=0, CORE1, CORE2, CORE3,} core_identifier;
-typedef enum { ADD = 0, SUB, AND, OR, XOR, MUL, SLL, SRA, SRL, BEQ, BNE, BLT, BGT, BLE, BGE, JAL, LW, SW, HALT = 20 }OpcodeOperations;
+typedef enum {invalid=0, shared, exclusive, modified} mesi_state;
+typedef enum {CORE0=0, CORE1, CORE2, CORE3,} core_identifier;
+typedef enum {ADD = 0, SUB, AND, OR, XOR, MUL, SLL, SRA, SRL, BEQ, BNE, BLT, BGT, BLE, BGE, JAL, LW, SW, HALT = 20 }OpcodeOperations;
+typedef enum {FETCH = 0, DECODE, EXECUTE, MEM, WRITE_BACK} phase_of_pipeline;
+typedef enum {core0_on_bus = 0, core1_on_bus, core2_on_bus, core3_on_bus, main_memory_on_bus, err_originator_on_bus = 0xFFFF} orig_id_on_bus;
+typedef enum {idle_cmd_on_bus, bus_read_cmd_on_bus, bus_read_exclusive_cmd_on_bus, bus_flush_cmd_on_bus} cmd_exec_on_bus;
+typedef enum {success_op, failed_op}exit_func_code;
+
+
+
+typedef struct
+{
+	phase_of_pipeline state;
+	uint32_t instruction;
+	uint32_t execution_output;
+	void (*operation)(parameters_to_command* arguments_to_cmd);
+	uint16_t pc;
+} current_pipeline_information;
+typedef struct
+{
+	orig_id_on_bus first_send_on_bus;
+	orig_id_on_bus origid_on_bus;
+	cmd_exec_on_bus command_on_bus;
+	uint32_t address_on_bus;
+	uint32_t data_on_bus;
+	bool is_bus_shared;
+} data_on_bus;
+typedef struct
+{
+	int core_number;
+	void* data_from_cache;
+} communication_of_bus_cache_info;
+
+/// <summary>
+/// Queue for Round-Robin arbitration
+/// </summary>
+typedef struct _linked_list
+{
+	data_on_bus data;
+	struct _linked_list* previous;
+	struct _linked_list* next;
+} arbitration_linked_list;
+
+
+typedef bool (*shared_function_pointer)(void* data_from_cache, data_on_bus* packet, bool* changed);
+typedef bool (*snoop_function_pointer)(void* data_from_cache, data_on_bus* packet, uint8_t address_offset);
+typedef bool (*cache_answer_function_pointer)(void* data_from_cache, data_on_bus* packet, uint8_t* address_offset);
+typedef bool (*send_to_memory_function_pointer)(data_on_bus* packet, bool direct_transaction);
+typedef enum {idle_status, ready_state, operate_state, final_state} operation_status;
+
+
 
 
 uint16_t get_address_offset(uint32_t address);
@@ -195,15 +162,48 @@ void bge(parameters_to_command* arguments_to_cmd);
 void jal(parameters_to_command* arguments_to_cmd);
 
 static void (*opcode_command_function_pointer[16])(parameters_to_command* arguments_to_cmd) = {
-	 add, sub, and, or, xor, mul, sll, sra,
+	 add, sub,and, or ,xor, mul, sll, sra,
 	 srl, beq, bne, blt, bgt,
 	 ble, bge, jal
 };
 
+void set_cache_bus_commu_func(communication_of_bus_cache_info cache_communication_bus);
+void set_cache_shared_function(shared_function_pointer shared_func);
+void set_bus_snoop_function(snoop_function_pointer snoop_func);
+void set_cache_answer_function(cache_answer_function_pointer cache_ans_func);
+void set_bus_memory_func(send_to_memory_function_pointer memory_operation);
+
+
+/// <summary>
+/// this func is pushing a new transaction to bus. Arbitration is Round-Robin
+/// </summary>
+/// <param name="bus_data"></param>
+void push_new_bus_operation(data_on_bus packet);
+
+/// <summary>
+/// check if the bus is currently on transaction
+/// </summary>
+/// <param name="core_id"></param>
+/// <returns>if the bus is on trnsation right now</returns>
+bool is_bus_busy(orig_id_on_bus core_id);
+
+/// <summary>
+/// check if the bus is in idle mode and he can operate
+/// </summary>
+/// <param name="core_id"></param>
+/// <returns>true if is idle</returns>
+bool is_bus_waiting_for_operate(orig_id_on_bus core_id);
+
+/// <summary>
+/// operation the bus
+/// </summary>
+/// <param name=""></param>
+void operate_bus(void);
 
 
 
 
 
 
-#endif //__FILE_NAME_H__
+
+#endif 

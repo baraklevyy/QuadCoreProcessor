@@ -69,7 +69,7 @@ void Core_Init(Core_s* core, uint8_t id)
 	memset(&core->statistics, 0, sizeof(Statistics_s));
 	core->statistics.cycles = -1; 
 
-	memset(&core->pipeline, 0, sizeof(Pipeline_s));
+	memset(&core->pipeline, 0, sizeof(pipe_data));
 	initialize_pip(&core->pipeline);
 
 	memset(&core->pipeline.current_data_from_cache, 0, sizeof(cache_information));
@@ -79,7 +79,7 @@ void Core_Init(Core_s* core, uint8_t id)
 	Cache_RegisterBusHandles();
 
 	core->pipeline.current_core_regs = core->register_array;
-	core->pipeline.insturcionts_p = core->instructions_memory_image;
+	core->pipeline.pointer_to_instruction = core->instructions_memory_image;
 	core->pipeline.opcode_params.pc = &(core->program_counter);
 }
 
@@ -110,7 +110,7 @@ void Core_Iter(Core_s* core)
 	memcpy(regs_copy, core->register_array, sizeof(core->register_array));
 
 	update_statistics(core);
-	Pipeline_Execute(&core->pipeline, core->index);
+	set_pip(&core->pipeline, core->index);
 	write_trace(core, regs_copy);
 	add_idle_slot(&core->pipeline);
 }

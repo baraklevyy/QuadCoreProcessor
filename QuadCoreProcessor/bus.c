@@ -1,189 +1,134 @@
-/*!
-******************************************************************************
-\file Bus.c
-\date 17 October 2021
-\author Rony Kositsky & Ofir Guthman & Yonatan Gartenberg
-\brief
-\details
-\par Copyright
-(c) Copyright 2021 Ofir & Rony & Yonatan
-\par
-ALL RIGHTS RESERVED
-*****************************************************************************/
-
-/************************************
-*      include                      *
-************************************/
-#include "bus.h"
 #include "helper.h"
-//
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 
-/************************************
-*      definitions                 *
-************************************/
 
-/************************************
-*       types                       *
-************************************/
+static communication_of_bus_cache_info gCacheInterface[CORES_NUMBER];
+static shared_function_pointer shared_func_ptr;
+static snoop_function_pointer snoop_func_ptr;
+static cache_answer_function_pointer cache_answer_func_ptr;
+static send_to_memory_function_pointer memory_func_ptr;
+static bool is_bus_operating;
+static operation_status core_operating_state[CORES_NUMBER] = { 0, 0, 0, 0 };
+static data_on_bus current_data_on_bus;
+static uint8_t offset_of_address;
+static uint32_t total_number_of_iterations = 0;
+static arbitration_linked_list* arbitration_first_element;
+static arbitration_linked_list* arbitration_last_element;
 
-typedef enum
-{
-	transaction_idle_state,
-	transaction_wait_state,
-	transaction_operation_state,
-	transaction_finally_state,
-} transaction_state_e;
 
-// Fifo types
-typedef struct _queue_item_s
-{
-	Bus_packet_s item;
-	struct _queue_item_s* parent;
-	struct _queue_item_s* next;
-} queue_item_s;
-
-/************************************
-*      variables                    *
-************************************/
-static Bus_cache_interface_s gCacheInterface[CORES_NUMBER];
-//
-// Callbacks
-static shared_signal_callback	gSharedSignalCallback;
-static cache_snooping_callback	gCacheSnoopingCallback;
-static cache_response_callback	gCacheResponseCallback;
-static memory_callback_t		gMemoryCallback;
-//
-// global variables
-static bool gBusInProgress;
-static transaction_state_e gBusTransactionState[CORES_NUMBER] = { 0, 0, 0, 0 };
-static Bus_packet_s gCurrentPacket;
-static uint8_t gAddressOffset;
-static uint32_t gIterCounter = 0;
-
-// Fifo variables
-static queue_item_s* gQueueHead;
-static queue_item_s* gQueueTail;
-
-/************************************
-*      static functions             *
-************************************/
-static bool check_shared_line(Bus_packet_s* packet, bool* is_modified);
-static bool check_cache_snooping(Bus_packet_s* packet);
-static void print_bus_status(Bus_packet_s packet);
+static bool is_bus_shared_line(data_on_bus* data, bool* changed);
+static bool is_cache_snooping(data_on_bus* data);
+static void bus_information_print(data_on_bus data);
 
 // Fifo functions
-bool bus_fifo_IsEmpty(void);
-bool bus_fifo_Enqueue(Bus_packet_s item);
-bool bus_fifo_Dequeue(Bus_packet_s* item);
+bool is_linked_list_empty(void);
+bool push_to_arbitration_line(data_on_bus data);
+bool pop_from_arbitration_line(data_on_bus* data);
 
 /************************************
 *       API implementation          *
 ************************************/
-void Bus_RegisterCache(Bus_cache_interface_s cache_interface)
+void set_cache_bus_commu_func(communication_of_bus_cache_info cache_communication_bus)
 {
-	gCacheInterface[cache_interface.core_id] = cache_interface;
+	gCacheInterface[cache_communication_bus.core_number] = cache_communication_bus;
 }
 
-void Bus_RegisterCacheCallbacks(shared_signal_callback signal_callback,
-	cache_snooping_callback snooping_callback,
-	cache_response_callback response_callback)
-{
-	gSharedSignalCallback = signal_callback;
-	gCacheSnoopingCallback = snooping_callback;
-	gCacheResponseCallback = response_callback;
+void set_cache_shared_function(shared_function_pointer shared) {
+	shared_func_ptr = shared;
+}
+void set_bus_snoop_function(snoop_function_pointer snoop) {
+	snoop_func_ptr = snoop;
+}
+void set_cache_answer_function(cache_answer_function_pointer answer) {
+	cache_answer_func_ptr = answer;
 }
 
-void Bus_RegisterMemoryCallback(memory_callback_t callback)
+void set_bus_memory_func(send_to_memory_function_pointer memory_operation)
 {
-	gMemoryCallback = callback;
+	memory_func_ptr = memory_operation;
 }
 
-void Bus_AddTransaction(Bus_packet_s packet)
+void push_new_bus_operation(data_on_bus bus_data)
 {
-	// check if this a duplicate transaction
-	bus_fifo_Enqueue(packet);
-
-	if (packet.bus_origid == bus_invalid_originator)
-		return;
-
-	gBusTransactionState[packet.bus_origid] = transaction_wait_state;
+	push_to_arbitration_line(bus_data);
+	if (err_originator_on_bus == bus_data.origid_on_bus) return;
+	core_operating_state[bus_data.origid_on_bus] = ready_state;
 }
 
-bool Bus_InTransaction(Bus_originator_e originator)
+bool is_bus_busy(orig_id_on_bus originator)
 {
-	return gBusTransactionState[originator] != transaction_idle_state;
+	return core_operating_state[originator] != idle_status;
 }
 
-bool Bus_WaitForTransaction(Bus_originator_e originator)
+bool is_bus_waiting_for_operate(orig_id_on_bus originator)
 {
-	return gBusTransactionState[originator] == transaction_wait_state;
+	return core_operating_state[originator] == ready_state;
 }
 
-void Bus_Iter(void)
+void operate_bus(void)
 {
 	static bool is_first_shared = true;
-	gIterCounter++;
+	total_number_of_iterations++;
 
-	if (gBusTransactionState[gCurrentPacket.bus_origid] == transaction_finally_state)
-		gBusTransactionState[gCurrentPacket.bus_origid] = transaction_idle_state;
+	if (core_operating_state[current_data_on_bus.origid_on_bus] == final_state)
+		core_operating_state[current_data_on_bus.origid_on_bus] = idle_status;
 
-	if (bus_fifo_IsEmpty() && !gBusInProgress)
+	if (is_linked_list_empty() && !is_bus_operating)
 	{
-		gCurrentPacket.bus_origid = bus_invalid_originator;
+		current_data_on_bus.origid_on_bus = err_originator_on_bus;
 		return;
 	}
 
-	if (!gBusInProgress)
+	if (!is_bus_operating)
 	{
 		is_first_shared = true;
-		int prev_origid = gCurrentPacket.bus_origid;
+		int prev_origid = current_data_on_bus.origid_on_bus;
 
-		if (!bus_fifo_Dequeue(&gCurrentPacket) || gCurrentPacket.bus_origid == bus_invalid_originator)
+		if (!pop_from_arbitration_line(&current_data_on_bus) || current_data_on_bus.origid_on_bus == err_originator_on_bus)
 			return;
 
-		gCurrentPacket.bus_original_sender = gCurrentPacket.bus_origid;
+		current_data_on_bus.first_send_on_bus = current_data_on_bus.origid_on_bus;
 
-		gBusInProgress = true;
-		gBusTransactionState[gCurrentPacket.bus_origid] = transaction_operation_state;
-		gAddressOffset = 0;
+		is_bus_operating = true;
+		core_operating_state[current_data_on_bus.origid_on_bus] = operate_state;
+		offset_of_address = 0;
 		// print bus trace
-		printf("bus trace - (#%d) dequeue next cmd\n", gIterCounter);
-		print_bus_status(gCurrentPacket);
+		printf("bus trace - (#%d) dequeue next cmd\n", total_number_of_iterations);
+		bus_information_print(current_data_on_bus);
 	}
 
-	Bus_packet_s packet;
-	memcpy(&packet, &gCurrentPacket, sizeof(gCurrentPacket));
+	data_on_bus data;
+	memcpy(&data, &current_data_on_bus, sizeof(current_data_on_bus));
 	memory_addess_s address;
-	address.address = gCurrentPacket.bus_addr;
-	//address.offset = gAddressOffset;
-	set_offset_to_address(&address, gAddressOffset);
-	packet.bus_addr = address.address;
+	address.address = current_data_on_bus.address_on_bus;
+	//address.offset = offset_of_address;
+	set_offset_to_address(&address, offset_of_address);
+	data.address_on_bus = address.address;
 
-	bool is_modified = false;
-	packet.bus_shared = check_shared_line(&gCurrentPacket, &is_modified);
-	if (is_modified && is_first_shared)
+	bool changed = false;
+	data.is_bus_shared = is_bus_shared_line(&current_data_on_bus, &changed);
+	if (changed && is_first_shared)
 	{
 		is_first_shared = false;
 		return;
 	}
 
-	bool cache_response = check_cache_snooping(&packet);
-	bool memory_response = gMemoryCallback(&packet, is_modified);
+	bool cache_response = is_cache_snooping(&data);
+	bool memory_response = memory_func_ptr(&data, changed);
 
 	if (memory_response)
 	{
 		// print response trace.
-		printf("bus trace - (#%d) response to sender\n", gIterCounter);
-		print_bus_status(packet);
+		printf("bus trace - (#%d) response to sender\n", total_number_of_iterations);
+		bus_information_print(data);
 
-		// send the response packet back to the sender
-		if (gCacheResponseCallback(gCacheInterface[gCurrentPacket.bus_origid].cache_data, &packet, &gAddressOffset))
+		// send the response data back to the sender
+		if (cache_answer_func_ptr(gCacheInterface[current_data_on_bus.origid_on_bus].data_from_cache, &data, &offset_of_address))
 		{
-			gBusTransactionState[gCurrentPacket.bus_origid] = transaction_finally_state;
-			gBusInProgress = false;
+			core_operating_state[current_data_on_bus.origid_on_bus] = final_state;
+			is_bus_operating = false;
 		}
 	}
 }
@@ -192,78 +137,78 @@ void Bus_Iter(void)
 /************************************
 * static implementation             *
 ************************************/
-static bool check_shared_line(Bus_packet_s* packet, bool* is_modified)
+static bool is_bus_shared_line(data_on_bus* data, bool* changed)
 {
 	bool shared = false;
 
 	for (int i = 0; i < CORES_NUMBER; i++)
-		shared |= gSharedSignalCallback(gCacheInterface[i].cache_data, packet, is_modified);
+		shared |= shared_func_ptr(gCacheInterface[i].data_from_cache, data, changed);
 
 	return shared;
 }
 
-static bool check_cache_snooping(Bus_packet_s* packet)
+static bool is_cache_snooping(data_on_bus* data)
 {
 	bool cache_response = false;
 	for (int i = 0; i < CORES_NUMBER; i++)
-		cache_response |= gCacheSnoopingCallback(gCacheInterface[i].cache_data, packet, gAddressOffset);
+		cache_response |= snoop_func_ptr(gCacheInterface[i].data_from_cache, data, offset_of_address);
 
 	return cache_response;
 }
 
-static void print_bus_status(Bus_packet_s packet)
+static void bus_information_print(data_on_bus data)
 {
-	fprintf(BusTraceFile, "%d %d %d %05X %08X %d\n", gIterCounter, packet.bus_origid, packet.bus_cmd,
-		packet.bus_addr, packet.bus_data, packet.bus_shared);
+	fprintf(BusTraceFile, "%d %d %d %05X %08X %d\n", total_number_of_iterations, data.origid_on_bus, data.command_on_bus,
+		data.address_on_bus, data.data_on_bus, data.is_bus_shared);
 }
 
 
 // Fifo implemantation
-bool bus_fifo_IsEmpty(void)
+bool is_linked_list_empty(void)
 {
-	return gQueueHead == NULL;
+	return arbitration_first_element == NULL;
 }
 
-bool bus_fifo_Enqueue(Bus_packet_s item)
+bool push_to_arbitration_line(data_on_bus data)
 {
-	queue_item_s* queue_item = malloc(sizeof(queue_item_s));
+	arbitration_linked_list* queue_item = malloc(sizeof(arbitration_linked_list));
 	if (queue_item == NULL)
 		return false;
 
-	// initiate item
-	queue_item->item = item;
+	// initiate data
+	queue_item->data = data;
 	queue_item->next = NULL;
-	queue_item->parent = NULL;
+	queue_item->previous = NULL;
 
-	if (bus_fifo_IsEmpty())
+	if (is_linked_list_empty())
 	{
-		gQueueHead = queue_item;
-		gQueueTail = queue_item;
+		arbitration_first_element = queue_item;
+		arbitration_last_element = queue_item;
 	}
 	else
 	{
-		gQueueHead->parent = queue_item;
-		queue_item->next = gQueueHead;
-		gQueueHead = queue_item;
+		arbitration_first_element->previous = queue_item;
+		queue_item->next = arbitration_first_element;
+		arbitration_first_element = queue_item;
 	}
 	return true;
 }
 
-bool bus_fifo_Dequeue(Bus_packet_s* item)
+bool pop_from_arbitration_line(data_on_bus* data)
 {
-	if (gQueueTail == NULL)
+	if (arbitration_last_element == NULL)
 		return false;
 
-	queue_item_s* queue_item = gQueueTail;
-	gQueueTail = queue_item->parent;
+	arbitration_linked_list* queue_item = arbitration_last_element;
+	arbitration_last_element = queue_item->previous;
 
-	if (gQueueTail == NULL)
-		gQueueHead = NULL;
+	if (arbitration_last_element == NULL)
+		arbitration_first_element = NULL;
 	else
-		gQueueTail->next = NULL;
+		arbitration_last_element->next = NULL;
 
-	queue_item->parent = NULL;
-	*item = queue_item->item;
+	queue_item->previous = NULL;
+	*data = queue_item->data;
 
 	free(queue_item);
 	return true;

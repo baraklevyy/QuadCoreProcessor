@@ -31,7 +31,7 @@ static bool gMemoryTransaction;
 /************************************
 *      static functions             *
 ************************************/
-static bool bus_transaction_handler(Bus_packet_s* packet, bool direct_transaction);
+static bool bus_transaction_handler(data_on_bus* packet, bool direct_transaction);
 static uint32_t get_memory_length(void);
 
 
@@ -45,7 +45,7 @@ void MainMemory_Init(void)
 	while (lineInProgram < MAIN_MEMORY_SIZE && fscanf(MeminFile, "%08x", (uint32_t*)&(gMemory[lineInProgram])) != EOF)
 		lineInProgram++;
 
-	Bus_RegisterMemoryCallback(bus_transaction_handler);
+	set_bus_memory_func(bus_transaction_handler);
 }
 
 void MainMemory_PrintData(void)
@@ -64,13 +64,13 @@ void MainMemory_PrintData(void)
 ******************************************************************************
 \brief
 Initialize main memory from input file.
-[in] Bus_packet_s* packet	 - pointer to bus packet.
+[in] data_on_bus* packet	 - pointer to bus packet.
 [in] bool direct_transaction - is direct transaction to the memory.
 \return false if finished, true otherwise.
 *****************************************************************************/
-static bool bus_transaction_handler(Bus_packet_s* packet, bool direct_transaction)
+static bool bus_transaction_handler(data_on_bus* packet, bool direct_transaction)
 {
-	if (packet->bus_cmd == bus_no_command)
+	if (packet->command_on_bus == idle_cmd_on_bus)
 		return false;
 
 	if (!gMemoryTransaction)
@@ -81,17 +81,17 @@ static bool bus_transaction_handler(Bus_packet_s* packet, bool direct_transactio
 
 	if (counter >= 16)
 	{
-		if (packet->bus_cmd == bus_busRd || packet->bus_cmd == bus_busRdX)
+		if (packet->command_on_bus == bus_read_cmd_on_bus || packet->command_on_bus == bus_read_exclusive_cmd_on_bus)
 		{
 			// send the memory value
-			packet->bus_origid = bus_main_memory;
-			packet->bus_cmd = bus_flush;
-			packet->bus_data = gMemory[packet->bus_addr];
+			packet->origid_on_bus = main_memory_on_bus;
+			packet->command_on_bus = bus_flush_cmd_on_bus;
+			packet->data_on_bus = gMemory[packet->address_on_bus];
 		}
-		else if (packet->bus_cmd == bus_flush)
+		else if (packet->command_on_bus == bus_flush_cmd_on_bus)
 		{
 			// write data to memory
-			gMemory[packet->bus_addr] = packet->bus_data;
+			gMemory[packet->address_on_bus] = packet->data_on_bus;
 		}
 
 		if (counter == 19)

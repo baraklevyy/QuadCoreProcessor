@@ -3,8 +3,12 @@
 #include <stdio.h>
 #include <string.h>
 #include "helper.h"
+#include "cache.h"
 
 
+/*###################################################
+#                 Implementing commands
+###################################################*/
 
 void add (parameters_to_command* arguments_to_cmd)
 {
@@ -110,6 +114,10 @@ void jal (parameters_to_command* arguments_to_cmd)
 	*(arguments_to_cmd->pc) = (uint16_t)(*(arguments_to_cmd->rd) & 0x1FF);
 }
 
+
+/*###################################################
+#                 Dealing with bits
+###################################################*/
 uint16_t get_address_offset(uint32_t address) {
 	uint32_t mask = 0x00000003;
 	uint16_t offset = address & mask;
@@ -128,20 +136,6 @@ void set_offset_to_address(uint32_t* address, uint8_t offset) {
 	mask = mask & offset;
 	*address = (*address) | mask;
 }
-
-/*
-typedef struct
-{
-	uint32_t data;
-
-	struct
-	{
-		uint16_t tag : 12;	// [0:11]
-		uint16_t mesi : 2;	// [12:13]
-	}fields;
-} Tsram_s;
-*/
-
 
 uint16_t get_tsram_tag(uint32_t tsram) {
 	uint32_t mask = 0x00000fff;
@@ -170,22 +164,6 @@ void set_mesi_state_to_tsram(uint32_t* tsram, uint16_t mesi_state) {
 	mask = (mask << 12);
 	*tsram = (*tsram) | mask;
 }
-
-
-/*
-typedef union
-{
-	uint32_t address;
-
-	struct
-	{
-		uint32_t offset : 2;	// [0:1]
-		uint32_t index : 6;	// [2:7]
-		uint32_t tag : 12;	// [8:19]
-	} as_bits;
-} cache_addess_s;
-*/
-
 
 uint32_t get_cache_address_offset(uint32_t cache) {
 	uint32_t mask = 0x00000003;
@@ -228,22 +206,6 @@ void set_tag_to_cache_address(uint32_t* cache, uint32_t tag) {
 	*cache = (*cache) | mask;
 }
 
-
-
-/*
-typedef union
-{
-	struct
-	{
-		uint16_t immediate : 12;
-		uint16_t rt : 4;
-		uint16_t rs : 4;
-		uint16_t rd : 4;
-		uint16_t opcode : 8;
-	} bits;
-
-	uint32_t cmd;
-} inst;*/
 uint16_t get_command_immediate(uint32_t cmd) {
 	uint32_t mask = 0x00000fff; //// setting ones just in the index location [0:11]
 	uint16_t immediate = cmd & mask;
@@ -273,3 +235,6 @@ uint16_t get_command_opcode(uint32_t cmd) {
 	opcode = (opcode >> 24); //need to shift the bits back to the lsb in order to isolate opcode
 	return (uint16_t*)opcode;
 }
+/*###################################################
+#                 Dealing with b
+###################################################*/
