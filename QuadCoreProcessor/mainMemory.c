@@ -16,7 +16,6 @@ ALL RIGHTS RESERVED
 *      include                      *
 ************************************/
 #include "mainMemory.h"
-#include "bus.h"
 #include "helper.h"
 #include <string.h>
 

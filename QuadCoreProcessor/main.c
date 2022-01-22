@@ -1,7 +1,6 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include "core.h"
 #include "mainMemory.h"
-#include "bus.h"
 #include <string.h>
 #include "helper.h"
 

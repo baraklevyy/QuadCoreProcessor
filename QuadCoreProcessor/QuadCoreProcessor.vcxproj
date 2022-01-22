@@ -148,7 +148,6 @@
     <ClCompile Include="pipline.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="bus.h" />
     <ClInclude Include="cache.h" />
     <ClInclude Include="core.h" />
     <ClInclude Include="helper.h" />

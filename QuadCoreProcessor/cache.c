@@ -3,7 +3,6 @@
 
 #include "helper.h"
 #include "cache.h"
-#include "bus.h"
 
 typedef mesi_state(*snooping_state)(cache_information* data, data_on_bus* packet);
 
@@ -61,7 +60,7 @@ bool Cache_ReadData(cache_information* cache_data, uint32_t address, uint32_t* d
 {
 	static bool miss_occurred = false;
 
-	if (is_bus_busy(cache_data->id) || is_bus_waiting_for_operate(cache_data->id))
+	if ((is_bus_busy(cache_data->id)) || (is_bus_waiting_for_operate(cache_data->id)))
 		return false;
 
 	//cache_addess_s addr;
@@ -114,7 +113,7 @@ bool Cache_WriteData(cache_information* cache_data, uint32_t address, uint32_t d
 {
 	static bool miss_occurred = false;
 
-	if (is_bus_busy(cache_data->id) || is_bus_waiting_for_operate(cache_data->id))
+	if ((is_bus_busy(cache_data->id)) || (is_bus_waiting_for_operate(cache_data->id)))
 		return false;
 
 	//cache_addess_s addr;

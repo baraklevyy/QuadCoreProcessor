@@ -27,7 +27,7 @@ typedef struct
 	uint32_t address;
 	uint16_t offset;
 	uint16_t block;
-} memory_addess_s;
+} mem_address;
 
 
 
