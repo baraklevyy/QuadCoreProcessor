@@ -3,6 +3,8 @@
 #include <string.h>
 #include "helper.h"
 
+
+//functions declarations
 static void fetch(pipe_data* pip);
 static void decode(pipe_data* pip);
 static void execute(pipe_data* pip);
@@ -14,16 +16,16 @@ static bool is_memory_stall(pipe_data pip);
 static void set_arguments_to_regs(pipe_data* pip, phase_of_pipeline phase);
 static bool is_data_stall(pipe_data pip);
 static bool is_reg_hazard(pipe_data* pip, phase_of_pipeline phase);
-static void update_statistics(pipe_data* pip);
 static void (*pipeline_functions_pointer[PIPELINE_SIZE])(pipe_data* pip) ={fetch, decode, execute, mem, writeback};
 static bool compare_register(pipe_data* pip, uint16_t reg);
 
 
 
-
-static void fetch(pipe_data* ppl)
-{
-
+/// <summary>
+/// executing fetch pipeline phase
+/// </summary>
+/// <param name="ppl"></param>
+static void fetch(pipe_data* ppl){
 	if (false == ppl->is_mem_stall) {
 		ppl->pipe_stages[FETCH].pc = *(ppl->opcode_params.pc);
 		ppl->pipe_stages[FETCH].instruction = ppl->pointer_to_instruction[*(ppl->opcode_params.pc)];
@@ -33,9 +35,11 @@ static void fetch(pipe_data* ppl)
 		}
 	}
 }
-
-static void decode(pipe_data* ppl)
-{
+/// <summary>
+/// executing decode phase
+/// </summary>
+/// <param name="ppl"></param>
+static void decode(pipe_data* ppl){
 	uint16_t code = get_command_opcode(ppl->pipe_stages[DECODE].instruction);
 	if (HALT == code)
 	{
@@ -51,9 +55,11 @@ static void decode(pipe_data* ppl)
 		ppl->pipe_stages[DECODE].operation(&ppl->opcode_params);
 	}
 }
-
-static void execute(pipe_data* ppl)
-{
+/// <summary>
+/// executing the exeute phase of pipeline
+/// </summary>
+/// <param name="ppl"></param>
+static void execute(pipe_data* ppl){
 	uint16_t code = get_command_opcode(ppl->pipe_stages[EXECUTE].instruction);
 	if (!(BEQ <= code && LW > code) && !(SW == code || LW == code) && HALT != code)
 	{
@@ -61,9 +67,11 @@ static void execute(pipe_data* ppl)
 		ppl->pipe_stages[EXECUTE].operation(&ppl->opcode_params);
 	}
 }
-
-static void mem(pipe_data* ppl)
-{
+/// <summary>
+/// execute the memory phase of pipeline
+/// </summary>
+/// <param name="ppl"></param>
+static void mem(pipe_data* ppl){
 	uint16_t code;
 	code = get_command_opcode(ppl->pipe_stages[MEM].instruction);
 	if (code == LW || code == SW) //if this is a memory phase
@@ -84,9 +92,11 @@ static void mem(pipe_data* ppl)
 		ppl->is_mem_stall = add_stall;
 	}
 }
-
-static void writeback(pipe_data* ppl)
-{
+/// <summary>
+/// execute the writeback phase of pipeline
+/// </summary>
+/// <param name="ppl"></param>
+static void writeback(pipe_data* ppl){
 	uint32_t instruction;
 	instruction = ppl->pipe_stages[WRITE_BACK].instruction;
 	int index_for_jump;
@@ -94,29 +104,36 @@ static void writeback(pipe_data* ppl)
 	else index_for_jump = get_command_rd(instruction);
 	*(ppl->current_core_regs + index_for_jump) = ppl->pipe_stages[WRITE_BACK].execution_output;
 }
-void set_pip(pipe_data* pip)
-{
+/// <summary>
+/// setting up the pipeline
+/// </summary>
+/// <param name="pip"></param>
+void set_pip(pipe_data* pip){
 	pip->is_data_stall = pipeline_needs_data_hazard_stall(pip);
 	start_pip_phases(pip);
-	update_statistics(pip);
+	if (is_data_stall(*pip) && (false == is_memory_stall(*pip))) pip->current_pip_decode_stalls++;
+	if (pip->is_mem_stall) pip->current_pip_memory_stalls++;
 }
 
 
-
-void tracing_pip(pipe_data* pip, FILE* f)
-{
-	for (int phase = FETCH; phase < 5; phase++)
-	{
-		if (MAX_INTEGER == pip->pipe_stages[phase].pc)
-			fprintf(f, "--- "); //this is the signs we asked to add
+/// <summary>
+/// printing the trace of the pipeline
+/// </summary>
+/// <param name="pip"></param>
+/// <param name="f"></param>
+void tracing_pip(pipe_data* pip, FILE* f){
+	for (int phase = FETCH; phase < 5; phase++){
+		if (MAX_INTEGER == pip->pipe_stages[phase].pc) fprintf(f, "--- "); //this is the signs we asked to add
 		else
 			fprintf(f, "%03X ", pip->pipe_stages[phase].pc);
 	}
 }
-
-
-static void set_arguments_to_regs(pipe_data* ppl, phase_of_pipeline ppl_phase)
-{
+/// <summary>
+/// setting up the correct arguments to the registers as in the command
+/// </summary>
+/// <param name="ppl"></param>
+/// <param name="ppl_phase"></param>
+static void set_arguments_to_regs(pipe_data* ppl, phase_of_pipeline ppl_phase){
 	uint32_t instruction;
 	instruction = ppl->pipe_stages[ppl_phase].instruction;
 	*(ppl->current_core_regs +REG_IMM) = get_command_immediate(instruction);
@@ -127,14 +144,14 @@ static void set_arguments_to_regs(pipe_data* ppl, phase_of_pipeline ppl_phase)
 	ppl->opcode_params.rt = ppl->current_core_regs[get_command_rt(instruction)];
 	ppl->opcode_params.rd = &ppl->pipe_stages[ppl_phase].execution_output;
 }
-
-void add_idle_slot(pipe_data* ppl)
-{
-	
+/// <summary>
+/// pushing stall to the pipeline
+/// </summary>
+/// <param name="ppl"></param>
+void add_idle_slot(pipe_data* ppl){
 	int current_stage = 4; // pipleline length - 1 
 	while (current_stage > 0) {
-		if (EXECUTE == current_stage && ppl->is_data_stall)
-		{
+		if (EXECUTE == current_stage && ppl->is_data_stall){
 			ppl->pipe_stages[EXECUTE].pc = MAX_INTEGER;
 			break;
 		}
@@ -143,13 +160,11 @@ void add_idle_slot(pipe_data* ppl)
 			ppl->pipe_stages[WRITE_BACK].pc = MAX_INTEGER;
 			break;
 		}
-		else if (ppl->pipe_stages[current_stage - 1].pc == MAX_INTEGER)
-		{
+		else if (ppl->pipe_stages[current_stage - 1].pc == MAX_INTEGER){
 			ppl->pipe_stages[current_stage].pc = MAX_INTEGER;
 			current_stage -= 1;
 		}
-		else
-		{
+		else{
 			ppl->pipe_stages[current_stage].pc = ppl->pipe_stages[current_stage - 1].pc;
 			ppl->pipe_stages[current_stage].instruction = ppl->pipe_stages[current_stage - 1].instruction;
 			ppl->pipe_stages[current_stage].operation = *ppl->pipe_stages[current_stage - 1].operation;
@@ -157,67 +172,70 @@ void add_idle_slot(pipe_data* ppl)
 			current_stage -= 1;
 		}
 	}
-	if (true == ppl->is_pip_halt)
-	{
+	if (true == ppl->is_pip_halt){
 		ppl->pipe_stages[FETCH].pc = MAX_INTEGER;
 		ppl->pipe_stages[DECODE].pc = MAX_INTEGER;
 	}
 }
-
-
 bool is_flush_require(pipe_data* pip, int phase) {
 	return (pip->pipe_stages[phase].pc == MAX_INTEGER);
 }
-bool flush_the_pipe(pipe_data* pip)
-{
+/// <summary>
+/// checking if there is a stall in the pipeline
+/// </summary>
+/// <param name="pip"></param>
+/// <returns></returns>
+bool flush_the_pipe(pipe_data* pip){
 	bool res;
 	res = pip->is_pip_halt;
-	for (int phase = FETCH; phase < 5; phase++)
-	{
+	for (int phase = FETCH; phase < 5; phase++){
 		res = res & (is_flush_require(pip, phase));
 	}
 	return res;
 }
 
-
-
-
-
-
-static void start_pip_phases(pipe_data* pip)
-{
+/// <summary>
+/// setting the correct fucntions after the stalls in the pipeline - this function updated the pipeline every core execution
+/// </summary>
+/// <param name="pip"></param>
+static void start_pip_phases(pipe_data* pip){
 	uint16_t phase;
 	if (pip->is_mem_stall) phase = MEM;
 	else if (pip->is_data_stall) phase = EXECUTE;
 	else phase = DECODE;
-	if (!pip->is_pip_halt)
-		pipeline_functions_pointer[FETCH](pip);
-
-	for (phase; phase < PIPELINE_SIZE; phase++)
-	{
+	if (!pip->is_pip_halt) pipeline_functions_pointer[FETCH](pip);
+	//after the stalls
+	for (phase; phase < PIPELINE_SIZE; phase++){
 		if (!(is_flush_require(pip, phase))) pipeline_functions_pointer[phase](pip);
 	}
 }
 
-
-
-
-
-static bool is_reg_hazard(pipe_data* pip, phase_of_pipeline phase)
-{
+/// <summary>
+/// cheking for hazard
+/// </summary>
+/// <param name="pip"></param>
+/// <param name="phase"></param>
+/// <returns>true if we have hazard</returns>
+static bool is_reg_hazard(pipe_data* pip, phase_of_pipeline phase){
 	if (pip->pipe_stages[phase].pc == MAX_INTEGER) return false;
 	return compare_register(pip, get_command_rd(pip->pipe_stages[phase].instruction));
 }
 
-
-static bool pipeline_needs_data_hazard_stall(pipe_data* pip)
-{
-	return is_reg_hazard(pip, EXECUTE) || is_reg_hazard(pip, WRITE_BACK) ||
-		is_reg_hazard(pip, MEM);
+/// <summary>
+/// telling if we have hazards and we need a stall
+/// </summary>
+/// <param name="pip"></param>
+/// <returns></returns>
+static bool pipeline_needs_data_hazard_stall(pipe_data* pip){
+	return is_reg_hazard(pip, EXECUTE) || is_reg_hazard(pip, WRITE_BACK) ||is_reg_hazard(pip, MEM);
 }
-
-static bool compare_register(pipe_data* pip, uint16_t reg)
-{
+/// <summary>
+/// compare data of 2 registers
+/// </summary>
+/// <param name="pip"></param>
+/// <param name="reg"></param>
+/// <returns>true if the data is identical</returns>
+static bool compare_register(pipe_data* pip, uint16_t reg){
 	bool ret = false;
 	uint32_t decode_ins = pip->pipe_stages[DECODE].instruction;
 	uint16_t op_write_back = get_command_opcode(pip->pipe_stages[WRITE_BACK].instruction);
@@ -233,8 +251,6 @@ bool reg_compare_logic(uint32_t instruction, uint16_t reg, uint16_t op_code, uin
 	if (reg == REG_IMM || reg == REG_ZERO) return false;
 	if (get_command_opcode(instruction) == LW || get_command_opcode(instruction) <= SRL || ((get_command_opcode(instruction) == SW && SW == op_write_back)))
 		return (reg_compare_helper(reg, get_command_rs(instruction)) || reg_compare_helper(reg, get_command_rt(instruction)));
-
-	
 	return (reg == get_command_rd(instruction) || reg == get_command_rs(instruction) || reg == get_command_rt(instruction));
 }
 
@@ -247,14 +263,10 @@ static bool is_memory_stall(pipe_data pip) {
 static bool is_data_stall(pipe_data pip) {
 	return pip.is_data_stall;
 }
-
-static void update_statistics(pipe_data* pip)
-{
-	if (is_data_stall(*pip) && (false == is_memory_stall(*pip))) pip->current_pip_decode_stalls++;
-
-	if (pip->is_mem_stall) pip->current_pip_memory_stalls++;
-
-}
+/// <summary>
+/// initialize the pipeline
+/// </summary>
+/// <param name="pip"></param>
 void initialize_pip(pipe_data* pip){
 	pip->is_pip_halt = false;
 	pip->is_data_stall = false;

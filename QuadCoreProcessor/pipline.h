@@ -7,9 +7,10 @@
 #include "helper.h"
 
 
-
-typedef struct
-{
+/// <summary>
+/// struct of pipeline - all the data that needed
+/// </summary>
+typedef struct{
 	uint32_t* current_core_regs;
 	cache_information current_data_from_cache;
 	uint32_t* pointer_to_instruction;

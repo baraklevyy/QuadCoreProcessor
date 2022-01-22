@@ -3,12 +3,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-
+//variables and functions declaration
 static snoop_function_pointer snoop_func_ptr;
 static send_to_memory_function_pointer memory_func_ptr;
 static uint8_t offset_of_address;
 static shared_function_pointer shared_func_ptr;
-static communication_of_bus_cache_info gCacheInterface[CORES_NUMBER];
+static communication_of_bus_cache_info cache_data_for_each_core[CORES_NUMBER];
 static cache_answer_function_pointer cache_answer_func_ptr;
 static exit_func_code is_bus_operating;
 static operation_status core_operating_state[CORES_NUMBER] = { 0, 0, 0, 0 };
@@ -22,12 +22,18 @@ static arbitration_linked_list* arbitration_first_element;
 static bool is_bus_shared_line(data_on_bus* data, bool* changed);
 bool push_to_arbitration_line(data_on_bus data);
 bool pop_from_arbitration_line(data_on_bus* data);
+/// <summary>
+/// registering the funtions into cache of different cores
+/// </summary>
+/// <param name="cache_communication_bus"></param>
 void set_cache_bus_commu_func(communication_of_bus_cache_info cache_communication_bus)
 {
-	gCacheInterface[cache_communication_bus.core_number] = cache_communication_bus;
+	cache_data_for_each_core[cache_communication_bus.core_number] = cache_communication_bus;
 }
-
-
+/// <summary>
+/// registering functions
+/// </summary>
+/// <param name="memory_operation"></param>
 void set_bus_memory_func(send_to_memory_function_pointer memory_operation)
 {
 	memory_func_ptr = memory_operation;
@@ -84,8 +90,7 @@ bool pop_from_arbitration_line(data_on_bus* data){
 /// pushing new wlwmwnt to arbitration queue
 /// </summary>
 /// <param name="bus_data"></param>
-void push_new_bus_operation(data_on_bus bus_data)
-{
+void push_new_bus_operation(data_on_bus bus_data){
 	push_to_arbitration_line(bus_data);
 	if (err_originator_on_bus == bus_data.origid_on_bus) return;
 	core_operating_state[bus_data.origid_on_bus] = ready_state;
@@ -96,10 +101,7 @@ void push_new_bus_operation(data_on_bus bus_data)
 /// <param name="originator"></param>
 /// <returns>true is busy</returns>
 bool is_bus_busy(orig_id_on_bus originator){
-
-	if (true == idle_cmd_on_bus != *(core_operating_state + originator)) {
-		return true;
-	}
+	if (true == idle_cmd_on_bus != *(core_operating_state + originator)) return true;
 	return false;
 }
 /// <summary>
@@ -108,9 +110,7 @@ bool is_bus_busy(orig_id_on_bus originator){
 /// <param name="originator"></param>
 /// <returns>true if the core is waiting</returns>
 bool is_bus_waiting_for_operate(orig_id_on_bus originator){
-	if (ready_state == *(core_operating_state + originator)) {
-		return true;
-	}
+	if (ready_state == *(core_operating_state + originator)) return true;
 	return false;
 }
 /// <summary>
@@ -132,8 +132,6 @@ void operate_bus(void){
 		is_bus_operating = !is_bus_operating;
 		*(core_operating_state + current_data_on_bus.origid_on_bus) = operate_state;
 		offset_of_address = 0;
-		// print bus trace
-		printf("bus trace - (#%d) dequeue next cmd\n", total_number_of_iterations);
 		bus_information_print(current_data_on_bus);
 	}
 	data_on_bus data;
@@ -151,10 +149,8 @@ void operate_bus(void){
 	}
 	is_cache_snooping(&data);
 	if (memory_func_ptr(&data, changed)){
-		// print response trace.
-		printf("bus trace - (#%d) response to sender\n", total_number_of_iterations);
 		bus_information_print(data);
-		if (true == (cache_answer_func_ptr(gCacheInterface[current_data_on_bus.origid_on_bus].data_from_cache, &data, &offset_of_address))){
+		if (true == (cache_answer_func_ptr(cache_data_for_each_core[current_data_on_bus.origid_on_bus].data_from_cache, &data, &offset_of_address))){
 			*(core_operating_state + current_data_on_bus.origid_on_bus) = final_state;
 			is_bus_operating = false;
 		}
@@ -169,7 +165,7 @@ void operate_bus(void){
 static bool is_bus_shared_line(data_on_bus* data, bool* changed){
 	bool shared = false;
 	for (int i = 0; i < CORES_NUMBER; i++) {
-		shared = shared | shared_func_ptr(gCacheInterface[i].data_from_cache, data, changed);
+		shared = shared | shared_func_ptr(cache_data_for_each_core[i].data_from_cache, data, changed);
 		if (true == shared) return true;
 	}
 	return false;
@@ -180,11 +176,10 @@ static bool is_bus_shared_line(data_on_bus* data, bool* changed){
 /// </summary>
 /// <param name="data"></param>
 /// <returns>true if there is answer from cache.</returns>
-static bool is_cache_snooping(data_on_bus* data)
-{
+static bool is_cache_snooping(data_on_bus* data){
 	bool answer_from_cache = false;
 	for (int i = 0; i < CORES_NUMBER; i++) {
-		answer_from_cache = answer_from_cache | snoop_func_ptr(gCacheInterface[i].data_from_cache, data, offset_of_address);
+		answer_from_cache = answer_from_cache | snoop_func_ptr(cache_data_for_each_core[i].data_from_cache, data, offset_of_address);
 		if (true == answer_from_cache) return true;
 	}
 	return false;

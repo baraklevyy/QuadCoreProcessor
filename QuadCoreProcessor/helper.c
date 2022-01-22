@@ -234,6 +234,4 @@ uint16_t get_command_opcode(uint32_t cmd) {
 	opcode = (opcode >> 24); //need to shift the bits back to the lsb in order to isolate opcode
 	return (uint16_t*)opcode;
 }
-/*###################################################
-#                 Dealing with b
-###################################################*/
+

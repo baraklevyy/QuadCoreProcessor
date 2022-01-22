@@ -2,9 +2,14 @@
 #include "core.h"
 #include <stdio.h>
 #include <string.h>
+//fucntion declarations
 static void fill_regs_files(data_of_core* core, uint32_t* regs_copy);
 bool pipeline_is_legal(data_of_core* core);
-
+/// <summary>
+/// initialize the core of the processor
+/// </summary>
+/// <param name="core"></param>
+/// <param name="id"></param>
 void initialize_core(data_of_core* core, uint8_t id){
 	int number_of_lines = 0;
 	while (number_of_lines < SIZE_OF_INST && fscanf(core->core_files.immediate_memory_file, "%08x", (uint32_t*)&(core->data_of_instruction[number_of_lines])) != -1) number_of_lines = number_of_lines + 1;
@@ -25,9 +30,18 @@ void initialize_core(data_of_core* core, uint8_t id){
 	core->pipeline.current_core_regs = core->data_register;
 	core->pipeline.opcode_params.pc = &(core->pc_of_core);
 }
+/// <summary>
+/// check if the pipeline is witout stalls or halts
+/// </summary>
+/// <param name="core"></param>
+/// <returns></returns>
 bool pipeline_is_legal(data_of_core* core) {
 	return (!core->pipeline.is_pip_halt && !core->pipeline.is_mem_stall && !core->pipeline.is_data_stall);
 }
+/// <summary>
+/// the main function that execute the core opetation every iteration
+/// </summary>
+/// <param name="core"></param>
 void operate_the_core(data_of_core* core){
 	if (true == core->is_core_terminated) return;
 	if (true == flush_the_pipe(&core->pipeline)){
@@ -45,6 +59,11 @@ void operate_the_core(data_of_core* core){
 	fprintf(core->core_files.core_trace_files, "\n");
 	add_idle_slot(&core->pipeline);
 }
+/// <summary>
+/// writing to the registers files. register 0 and register 1 are constant and shouldnt be written into.
+/// </summary>
+/// <param name="core"></param>
+/// <param name="regs_copy"></param>
 static void fill_regs_files(data_of_core* core, uint32_t* regs_copy){
 	for (int i = 2; i < NUMBER_OF_REGISTERS; i++){
 		fprintf(core->core_files.core_trace_files, "%08X ", *(regs_copy + i));
