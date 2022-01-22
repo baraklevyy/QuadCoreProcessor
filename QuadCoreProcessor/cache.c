@@ -1,402 +1,219 @@
-
-#include <string.h>
-
 #include "helper.h"
-#include "cache.h"
+#include <string.h>
+mesi_state current_shared_state(cache_information* data, data_on_bus* data_container_from_bus);
+bool check_existance_of_block(cache_information* data, data_on_bus* data_container_from_bus, uint8_t address_offset);
+mesi_state current_modified_state(cache_information* data, data_on_bus* data_container_from_bus);
+mesi_state current_exclusive_state(cache_information* data, data_on_bus* data_container_from_bus);
+bool shared_block_check(cache_information* data, data_on_bus* data_container_from_bus, bool* changed);
+bool cache_data_answer(cache_information* data, data_on_bus* data_container_from_bus, uint8_t* address_offset);
+mesi_state current_invalid_state(cache_information* data, data_on_bus* data_container_from_bus);
+typedef mesi_state(*get_mesi_block_state_from_bus_snoop)(cache_information* data, data_on_bus* data_container_from_bus);
+void operate_dirty_block(cache_information* data, uint32_t addr);
+get_mesi_block_state_from_bus_snoop from_what_mesi_state_operate[4] = {current_invalid_state, current_shared_state, current_exclusive_state, current_modified_state};
 
-typedef mesi_state(*snooping_state)(cache_information* data, data_on_bus* packet);
+/// <summary>
+/// data read from cache
+/// </summary>
+/// <param name="cache_data"></param>
+/// <param name="address"></param>
+/// <param name="data"></param>
+/// <returns>success if read succeed, fail otherwise</returns>
 
-/************************************
-*      static functions             *
-************************************/
-//static void dirty_block_handling(cache_information* data, cache_addess_s addr);
-static void dirty_block_handling(cache_information* data, uint32_t addr);
-
-// handles
-static bool shared_signal_handle(cache_information* data, data_on_bus* packet, bool* changed);
-static bool cache_snooping_handle(cache_information* data, data_on_bus* packet, uint8_t address_offset);
-static bool cache_response_handle(cache_information* data, data_on_bus* packet, uint8_t* address_offset);
-
-// state machine for snooping
-static mesi_state mesi_snooping_invalid_state(cache_information* data, data_on_bus* packet);
-static mesi_state mesi_snooping_shared_state(cache_information* data, data_on_bus* packet);
-static mesi_state mesi_snooping_exlusive_state(cache_information* data, data_on_bus* packet);
-static mesi_state mesi_snooping_modified_state(cache_information* data, data_on_bus* packet);
-
-/************************************
-*      variables                    *
-************************************/
-static snooping_state gSnoopingSM[4] = {
-	mesi_snooping_invalid_state,
-	mesi_snooping_shared_state,
-	mesi_snooping_exlusive_state,
-	mesi_snooping_modified_state
-};
-
-/************************************
-*       API implementation          *
-************************************/
-void Cache_Init(cache_information* data, core_identifier id)
-{
-	// set all cache memory to 0;
-	memset((uint8_t*)data, 0, sizeof(data));
+/// <summary>
+/// setting up the cache
+/// </summary>
+/// <param name="data"></param>
+/// <param name="id"></param>
+void initialize_the_cache(cache_information* data, core_identifier id){
 	data->id = id;
-
-	// Register memory_operation
-	communication_of_bus_cache_info cache_communication_bus = { .core_number = id, .data_from_cache = data };
+	communication_of_bus_cache_info cache_communication_bus;
 	cache_communication_bus.data_from_cache = data;
 	cache_communication_bus.core_number = id;
 	set_cache_bus_commu_func(cache_communication_bus);
 }
-
-void Cache_RegisterBusHandles(void)
-{
-	set_cache_answer_function(cache_response_handle);
-	set_cache_shared_function(shared_signal_handle );
-	set_bus_snoop_function(cache_snooping_handle);
-}
-
-bool Cache_ReadData(cache_information* cache_data, uint32_t address, uint32_t* data)
-{
-	static bool miss_occurred = false;
-
-	if ((is_bus_busy(cache_data->id)) || (is_bus_waiting_for_operate(cache_data->id)))
-		return false;
-
-	//cache_addess_s addr;
+exit_func_code read_from_cache(cache_information* cache_data, uint32_t address, uint32_t* data){
+	static bool data_is_missing = false;
+	if ((true == is_bus_busy(cache_data->id)) || (true == is_bus_waiting_for_operate(cache_data->id))) return failed_op;
 	uint32_t addr;
-	//addr.address = address;
 	addr = address;
-	//uint32_t cache_tsram_memory = cache_data->tsram[addr.as_bits.index];
-	uint32_t cache_tsram_memory = cache_data->tsram[get_cache_address_index(addr)];
-	//Tsram_s* tsram = &(cache_data->tsram[addr.as_bits.index]);
-	//uint32_t* tsram = &(cache_data->tsram[addr.as_bits.index]);
-
-	// check if addresss tag is locate on block_number
-	//if (tsram->fields.tag == addr.as_bits.tag && tsram->fields.mesi != cache_mesi_invalid)
-	//if (get_tsram_tag(cache_tsram_memory) == addr.as_bits.tag && get_tsram_mesi_state(cache_tsram_memory) != invalid)
-	if (get_tsram_tag(cache_tsram_memory) == get_cache_address_tag(addr) && get_tsram_mesi_state(cache_tsram_memory) != invalid)
-	{
-		// hit on cache, getting the value 
-		//uint16_t index = addr.as_bits.index * BLOCK_SIZE + addr.as_bits.offset;
-		uint16_t index = get_cache_address_index(addr) * BLOCK_SIZE + get_cache_address_offset(addr);
+	uint32_t cache_tsram_memory;
+	cache_tsram_memory  = cache_data->tsram[get_cache_address_index(addr)];
+	if (get_tsram_tag(cache_tsram_memory) == get_cache_address_tag(addr) && get_tsram_mesi_state(cache_tsram_memory) != invalid){//hit
+		uint16_t index;
+		index = (BLOCK_SIZE) * (get_cache_address_index(addr)) + get_cache_address_offset(addr);
 		*data = cache_data->dsram[index];
-
-		if (!miss_occurred)
-			cache_data->statistics.read_hits++;
-		else
-			miss_occurred = false;
-
-		return true;
+		if (false == data_is_missing) cache_data->number_of_read_hit = cache_data->number_of_read_hit + 1; //flag should stay false since we had hit
+		else data_is_missing = !data_is_missing;//previous op was miss, now we change the flag since we had hit
+		return success_op;
 	}
-
-	// we had a miss.
-	miss_occurred = true;
-	cache_data->statistics.read_misses++;
-
-	// first, check if the required block is dirty
-	// if so, we need first to send the block into the memory
-	dirty_block_handling(cache_data, addr);
-
-	// now, we need to take the new block from the main memory.
-	data_on_bus packet = {
-		//.origid_on_bus = cache_data->id, .command_on_bus = bus_read_cmd_on_bus, .address_on_bus = addr.address, .data_on_bus = 0, .is_bus_shared = 0 };
-		.origid_on_bus = cache_data->id, .command_on_bus = bus_read_cmd_on_bus, .address_on_bus = addr, .data_on_bus = 0, .is_bus_shared = 0 };
-
-	// add the read transaction into the bus queue
-	push_new_bus_operation(packet);
-
-	return false;
+	//this is not a hit, so we have miss on the data from cache
+	data_is_missing = true;
+	cache_data->number_of_read_miss = cache_data->number_of_read_miss + 1;
+	operate_dirty_block(cache_data, addr); //we had miss, if the block is dirty we have to write it into memory
+	data_on_bus data_container_from_bus;
+	data_container_from_bus.is_bus_shared = false;
+	data_container_from_bus.data_on_bus = (uint32_t*)0;
+	data_container_from_bus.origid_on_bus = cache_data->id;
+	data_container_from_bus.command_on_bus = bus_read_cmd_on_bus;
+	data_container_from_bus.address_on_bus = addr;
+	push_new_bus_operation(data_container_from_bus);
+	return failed_op;
 }
-
-bool Cache_WriteData(cache_information* cache_data, uint32_t address, uint32_t data)
-{
-	static bool miss_occurred = false;
-
-	if ((is_bus_busy(cache_data->id)) || (is_bus_waiting_for_operate(cache_data->id)))
-		return false;
-
-	//cache_addess_s addr;
+/// <summary>
+/// writing into the cache and dealing with cache coherence using snoop and mesi algorithms
+/// </summary>
+/// <param name="cache_data"></param>
+/// <param name="address"></param>
+/// <param name="data"></param>
+/// <returns>success_op is write to bus success</returns>
+exit_func_code write_to_cache(cache_information* cache_data, uint32_t address, uint32_t data){
+	static bool data_is_missing = false;
+	if ((true == is_bus_busy(cache_data->id)) || (true == is_bus_waiting_for_operate(cache_data->id))) return failed_op;
 	uint32_t addr;
-	//addr.address = address;
 	addr = address;
-	//Tsram_s* tsram = &(cache_data->tsram[addr.as_bits.index]);
-	//uint32_t* tsram = &(cache_data->tsram[addr.as_bits.index]);
-	uint32_t* tsram = &(cache_data->tsram[get_cache_address_index(addr)]);
-
-	// check if addresss tag is locate on block_number
-	//if (tsram->fields.tag == addr.as_bits.tag && tsram->fields.mesi != cache_mesi_invalid)
-	//if (get_tsram_tag(*tsram) == addr.as_bits.tag && get_tsram_mesi_state(*tsram) != invalid)
-	if (get_tsram_tag(*tsram) == get_cache_address_tag(addr) && get_tsram_mesi_state(*tsram) != invalid)
-	{
-		// if the block is shared, we need to go with RdX transaction and we have a miss.
-				//if (tsram->fields.mesi == cache_mesi_shared)
-		if (get_tsram_mesi_state(*tsram) == shared)
-		{
-			miss_occurred = true;
-			cache_data->statistics.write_misses++;
-			// Send Bus_Rdx to make sure this block is exclusive ours
-			data_on_bus packet = {
-				.origid_on_bus = cache_data->id, .command_on_bus = bus_read_exclusive_cmd_on_bus, .address_on_bus = addr, .data_on_bus = 0, .is_bus_shared = 0 };
-
-			push_new_bus_operation(packet);
-
-			// add invalid packet for delay the in one cycle the next request
-			data_on_bus invalid_packet = { .origid_on_bus = err_originator_on_bus };
-			push_new_bus_operation(invalid_packet);
-			return false;
+	uint32_t* tsram;
+	tsram = &(cache_data->tsram[get_cache_address_index(addr)]);
+	if (get_tsram_tag(*tsram) == get_cache_address_tag(addr) && get_tsram_mesi_state(*tsram) != invalid){ //check for equalitiy of tags and not invalid state - check for hit
+		if (shared != get_tsram_mesi_state(*tsram)) { //hit and no shared data
+			if (false == data_is_missing) cache_data->number_of_write_hit = cache_data->number_of_write_hit + 1;//we have write hit and the block is exclusive, so we can just change it
+			else data_is_missing = false;
+			uint16_t index = (BLOCK_SIZE) * (get_cache_address_index(addr)) + get_cache_address_offset(addr);
+			cache_data->dsram[index] = data;
+			uint32_t temp;
+			temp = cache_data->tsram[get_cache_address_index(addr)];
+			set_mesi_state_to_tsram(&temp, (uint16_t*)modified); //now this block is currently dirty so setting it to exclusive state
+			cache_data->tsram[get_cache_address_index(addr)] = temp;
+			return success_op;
 		}
-
-		// hit on cache, write data
-		// if the block is exclusive ours, we just change it locally
-		if (!miss_occurred)
-			cache_data->statistics.write_hits++;
-		else
-			miss_occurred = false;
-
-		//uint16_t index = addr.as_bits.index * BLOCK_SIZE + addr.as_bits.offset;
-		uint16_t index = get_cache_address_index(addr) * BLOCK_SIZE + get_cache_address_offset(addr);
-		cache_data->dsram[index] = data;
-		// update modified flag.
-		//cache_data->tsram[addr.as_bits.index].fields.mesi = cache_mesi_modified;
-		//uint32_t temp = cache_data->tsram[addr.as_bits.index];
-		uint32_t temp = cache_data->tsram[get_cache_address_index(addr)];
-		set_mesi_state_to_tsram(&temp, (uint16_t*)modified);
-		//cache_data->tsram[addr.as_bits.index] = temp;
-		//cache_data->tsram[addr.as_bits.index] = temp;
-		cache_data->tsram[get_cache_address_index(addr)] = temp;
-		return true;
+		if (shared == get_tsram_mesi_state(*tsram)){ //if the block is shared we need to implement bus_read transaction on the bus, also dealing it as a data miss
+			data_is_missing = true;
+			cache_data->number_of_write_miss = cache_data->number_of_write_miss + 1;
+			//push bus_read_exclusive since we are writing new data
+			data_on_bus data_container_from_bus;
+			data_container_from_bus.is_bus_shared = false;
+			data_container_from_bus.data_on_bus = (uint32_t*)0;
+			data_container_from_bus.origid_on_bus = cache_data->id;
+			data_container_from_bus.command_on_bus = bus_read_exclusive_cmd_on_bus;
+			data_container_from_bus.address_on_bus = addr;
+			push_new_bus_operation(data_container_from_bus);
+			data_on_bus delaying_next_request_container;
+			delaying_next_request_container.origid_on_bus = err_originator_on_bus; //we need to delay the next operation in one cycle so pushing no-operation container to the bus
+			push_new_bus_operation(delaying_next_request_container);
+			return failed_op;
+		}
 	}
-	// we had a miss.
-	miss_occurred = true;
-	cache_data->statistics.write_misses++;
-
-	// first, check if the required block is dirty
-	// if so, we need first to send the block into the memory
-	dirty_block_handling(cache_data, addr);
-
-	// we need to take the data from the main memory.
-	data_on_bus packet = {
-		//.origid_on_bus = cache_data->id, .command_on_bus = bus_read_exclusive_cmd_on_bus, .address_on_bus = addr.address, .data_on_bus = 0, .is_bus_shared = 0 };
-		.origid_on_bus = cache_data->id, .command_on_bus = bus_read_exclusive_cmd_on_bus, .address_on_bus = addr, .data_on_bus = 0, .is_bus_shared = 0 };
-
-	// add the read transaction into the bus queue
-	push_new_bus_operation(packet);
-
-	return false;
+	data_is_missing = true; //the tags arent equal so we have miss
+	cache_data->number_of_write_miss = cache_data->number_of_write_miss + 1;
+	operate_dirty_block(cache_data, addr); //if the block is dirty, we have to write it into main memory
+	data_on_bus data_container_from_bus;
+	data_container_from_bus.is_bus_shared = false;
+	data_container_from_bus.data_on_bus = (uint32_t*)0;
+	data_container_from_bus.origid_on_bus = cache_data->id;
+	data_container_from_bus.command_on_bus = bus_read_exclusive_cmd_on_bus;
+	data_container_from_bus.address_on_bus = addr;
+	push_new_bus_operation(data_container_from_bus);
+	return failed_op;
 }
 
-void Cache_PrintData(cache_information* cache_data, FILE* dsram_file, FILE* tsram_file)
-{
-	for (uint32_t i = 0; i < CACHE_SIZE; i++)
-		fprintf(dsram_file, "%08X\n", cache_data->dsram[i]);
-
-	for (uint32_t i = 0; i < TSRAM_NUMBER_OF_LINES; i++)
-		//fprintf(tsram_file, "%08X\n", cache_data->tsram[i].data);
-		fprintf(tsram_file, "%08X\n", cache_data->tsram[i]);
+void cache_print_to_file(cache_information* cache_data, FILE* dsram_f, FILE* tsram_f){
+	for (uint32_t i = 0; i < CACHE_SIZE; i++) {
+		uint32_t* tmp = cache_data->dsram;
+		fprintf(dsram_f, "%08X\n", *(tmp + i));
+	}
+	for (uint32_t i = 0; i < TSRAM_NUMBER_OF_LINES; i++) {
+		uint32_t* tmp = cache_data->tsram;
+		fprintf(tsram_f, "%08X\n", *(tmp + i));
+	}
 }
-
-/************************************
-* static implementation             *
-************************************/
-//static void dirty_block_handling(CacheData_s* data, cache_addess_s addr)
-static void dirty_block_handling(cache_information* data, uint32_t addr)
-{
-	//if (data->tsram[addr.as_bits.index].fields.mesi == cache_mesi_modified)
-	//if (get_tsram_mesi_state(data->tsram[addr.as_bits.index]) == modified)
-	if (get_tsram_mesi_state(data->tsram[get_cache_address_index(addr)]) == modified)
-	{
-		// get stored block address
-		//cache_addess_s block_addr = {
-		/*uint32_t block_addr = {
-			.as_bits.index = addr.as_bits.index,
-			//.as_bits.tag = data->tsram[addr.as_bits.index].fields.tag,
-			.as_bits.tag = get_tsram_tag(data->tsram[addr.as_bits.index]),
-			.as_bits.offset = 0
-		};*/
-		//updating the cache address with the corresponding index, tag, offset bits
+mesi_state current_invalid_state(cache_information* data, data_on_bus* data_container_from_bus){
+	return invalid;
+}
+mesi_state current_shared_state(cache_information* data, data_on_bus* data_container_from_bus){
+	if (data_container_from_bus->command_on_bus == bus_read_exclusive_cmd_on_bus) return invalid;
+	return shared;
+}
+mesi_state current_exclusive_state(cache_information* data, data_on_bus* data_container_from_bus){
+	if (data_container_from_bus->command_on_bus == bus_read_cmd_on_bus) return shared;
+	if (data_container_from_bus->command_on_bus == bus_read_exclusive_cmd_on_bus) return invalid;
+	return exclusive;
+}
+mesi_state current_modified_state(cache_information* data, data_on_bus* data_container_from_bus){
+	uint32_t address = data_container_from_bus->address_on_bus;
+	uint16_t index = (uint16_t*)(get_cache_address_index(address) * BLOCK_SIZE + get_cache_address_offset(address));
+	if (data_container_from_bus->command_on_bus == bus_read_cmd_on_bus || data_container_from_bus->command_on_bus == bus_read_exclusive_cmd_on_bus || data_container_from_bus->command_on_bus == bus_flush_cmd_on_bus){
+		data_container_from_bus->command_on_bus = bus_flush_cmd_on_bus;
+		data_container_from_bus->data_on_bus = data->dsram[index];
+		data_container_from_bus->origid_on_bus = data->id;
+		mesi_state next_state = data_container_from_bus->command_on_bus == bus_read_cmd_on_bus ? shared : data_container_from_bus->command_on_bus == bus_read_exclusive_cmd_on_bus ? invalid : modified;
+		return next_state;
+	}
+}
+bool shared_block_check(cache_information* data, data_on_bus* data_container_from_bus, bool* changed){
+	if (data->id == data_container_from_bus->origid_on_bus) return false; //if this is a self-data
+	uint32_t address = data_container_from_bus->address_on_bus;
+	uint32_t* tsram = &(data->tsram[get_cache_address_index(address)]);
+	*changed = *changed | (modified == get_tsram_mesi_state(*tsram));
+	return get_tsram_tag(*tsram) == get_cache_address_tag(address) && get_tsram_mesi_state(*tsram) != invalid;
+}
+void operate_dirty_block(cache_information* data, uint32_t addr){
+	if (modified == get_tsram_mesi_state(data->tsram[get_cache_address_index(addr)])){
 		uint32_t block_addr = 0x00000000;
 		set_index_to_cache_address(&block_addr, get_cache_address_index(addr));
 		uint32_t tmp = 0x00000000;
 		tmp = get_tsram_tag(data->tsram[get_cache_address_index(addr)]);
 		set_tag_to_cache_address(&block_addr, tmp);
 		set_offset_to_cache_address(&block_addr, 0x00000000);
-
-
-		// send bus flush
-		data_on_bus packet = {
-			//.origid_on_bus = data->id, .command_on_bus = bus_flush_cmd_on_bus, .address_on_bus = block_addr.address, .is_bus_shared = 0 };
-			.origid_on_bus = data->id, .command_on_bus = bus_flush_cmd_on_bus, .address_on_bus = block_addr, .is_bus_shared = 0 };
-
-		//uint16_t index = addr.as_bits.index * BLOCK_SIZE + addr.as_bits.offset;
+		data_on_bus data_container_from_bus;
+		data_container_from_bus.is_bus_shared = false;
+		data_container_from_bus.origid_on_bus = data->id;
+		data_container_from_bus.command_on_bus = bus_flush_cmd_on_bus;
+		data_container_from_bus.address_on_bus = block_addr;
 		uint16_t index = get_cache_address_index(addr) * BLOCK_SIZE + get_cache_address_offset(addr);
-		packet.data_on_bus = data->dsram[index];
-
-		// add the flush transaction into the bus queue
-		push_new_bus_operation(packet);
+		data_container_from_bus.data_on_bus = data->dsram[index];
+		push_new_bus_operation(data_container_from_bus); //push the flush operation into arbitration linked list
 	}
 }
-
-
-static bool shared_signal_handle(cache_information* data, data_on_bus* packet, bool* changed)
-{
-	// check if this is my packet
-	if (data->id == packet->origid_on_bus)
-		return false;
-
-	//cache_addess_s address = { .address = packet->address_on_bus };
-	uint32_t address = packet->address_on_bus;
-	//Tsram_s* tsram = &(data->tsram[address.as_bits.index]);
-	//uint32_t* tsram = &(data->tsram[address.as_bits.index]);
+bool check_existance_of_block(cache_information* data, data_on_bus* data_container_from_bus, uint8_t address_offset){
+	if (data->id == data_container_from_bus->first_send_on_bus && data_container_from_bus->command_on_bus != bus_flush_cmd_on_bus) return false; //sef-data
+	uint32_t address = data_container_from_bus->address_on_bus;
 	uint32_t* tsram = &(data->tsram[get_cache_address_index(address)]);
-	//
-	*changed |= get_tsram_mesi_state(*tsram) == modified;
-	//return tsram->fields.tag == address.as_bits.tag && tsram->fields.mesi != cache_mesi_invalid;
-	//return get_tsram_tag(*tsram) == address.as_bits.tag && get_tsram_mesi_state(*tsram) != invalid;
-	return get_tsram_tag(*tsram) == get_cache_address_tag(address) && get_tsram_mesi_state(*tsram) != invalid;
-}
-
-static bool cache_snooping_handle(cache_information* data, data_on_bus* packet, uint8_t address_offset)
-{
-	// check if this is my packet
-	if (data->id == packet->first_send_on_bus && packet->command_on_bus != bus_flush_cmd_on_bus)
-		return false;
-
-	//cache_addess_s address = { .address = packet->address_on_bus };
-	uint32_t address = packet->address_on_bus;
-	//Tsram_s* tsram = &(data->tsram[address.as_bits.index]);
-	//uint32_t* tsram = &(data->tsram[address.as_bits.index]);
-	uint32_t* tsram = &(data->tsram[get_cache_address_index(address)]);
-
-	// check if the block is in the cache, if not, do nothing.
-	//if (tsram->fields.tag != address.as_bits.tag || tsram->fields.mesi == cache_mesi_invalid)
-	//if (get_tsram_tag(*tsram) != address.as_bits.tag || get_tsram_mesi_state(*tsram) == invalid)
-	if (get_tsram_tag(*tsram) != get_cache_address_tag(address) || get_tsram_mesi_state(*tsram) == invalid)
-		return false;
-
-	// execute block state machine
-	//Cache_mesi_e next_state = gSnoopingSM[tsram->fields.mesi](data, packet);
-	mesi_state next_state = gSnoopingSM[get_tsram_mesi_state(*tsram)](data, packet);
-
-	//if (address_offset == (BLOCK_SIZE - 1) || tsram->fields.mesi != cache_mesi_modified)
-	if (address_offset == (BLOCK_SIZE - 1) || get_tsram_mesi_state(*tsram) != modified)
-	{
-		//tsram->fields.mesi = next_state;
-		set_mesi_state_to_tsram(tsram, (uint16_t*)next_state);
-	}
-
+	if (get_tsram_tag(*tsram) != get_cache_address_tag(address) || get_tsram_mesi_state(*tsram) == invalid) return false; //the block is not in cache
+	mesi_state next_state = from_what_mesi_state_operate[get_tsram_mesi_state(*tsram)](data, data_container_from_bus); //changing the state of block regarding the MESI algorithm
+	if ((BLOCK_SIZE - 1) == address_offset || get_tsram_mesi_state(*tsram) != modified) set_mesi_state_to_tsram(tsram, (uint16_t*)next_state);
 	return true;
 }
-
-static bool cache_response_handle(cache_information* data, data_on_bus* packet, uint8_t* address_offset)
-{
-	// check if this is my packet
-	if (data->id == packet->origid_on_bus && packet->command_on_bus != bus_flush_cmd_on_bus)
-		return false;
-	else if (data->id == packet->origid_on_bus && packet->command_on_bus == bus_flush_cmd_on_bus)
-	{
-		if (*address_offset == (BLOCK_SIZE - 1))
-			return true;
-
+static bool cache_data_answer(cache_information* data, data_on_bus* data_container_from_bus, uint8_t* address_offset){
+	if (data->id == data_container_from_bus->origid_on_bus && data_container_from_bus->command_on_bus != bus_flush_cmd_on_bus) return false; //self data
+	else if (data->id == data_container_from_bus->origid_on_bus && data_container_from_bus->command_on_bus == bus_flush_cmd_on_bus){
+		if ((BLOCK_SIZE - 1)  == *address_offset) return true;
 		*address_offset += 1;
 		return false;
 	}
-
-	//cache_addess_s address = { .address = packet->address_on_bus };
-	uint32_t address = packet->address_on_bus;
-	//Tsram_s* tsram = &(data->tsram[address.as_bits.index]);
-	//uint32_t* tsram = &(data->tsram[address.as_bits.index]);
+	uint32_t address = data_container_from_bus->address_on_bus;
 	uint32_t* tsram = &(data->tsram[get_cache_address_index(address)]);
-	
-
-	// update the new tag
-	//tsram->fields.tag = address.as_bits.tag;
-	//set_tag_to_tsram(tsram, address.as_bits.tag);
-	set_tag_to_tsram(tsram, (uint16_t*)get_cache_address_tag(address));
-
-	// execute block state machine
-	if (packet->command_on_bus == bus_flush_cmd_on_bus)
-	{
-		//uint16_t index = address.as_bits.index * BLOCK_SIZE + address.as_bits.offset;
+	set_tag_to_tsram(tsram, (uint16_t*)get_cache_address_tag(address));//new tag
+	if (bus_flush_cmd_on_bus == data_container_from_bus->command_on_bus){
 		uint16_t index = (uint16_t*)(get_cache_address_index(address) * BLOCK_SIZE + get_cache_address_offset(address));
-		data->dsram[index] = packet->data_on_bus;
+		data->dsram[index] = data_container_from_bus->data_on_bus;
 	}
-
-	if (*address_offset == (BLOCK_SIZE - 1))
-	{
-		//tsram->fields.mesi = packet->is_bus_shared ? cache_mesi_shared : cache_mesi_exclusive;
-		if (true == packet->is_bus_shared)
-			set_mesi_state_to_tsram(tsram, (uint16_t*)shared);
-		else
-			set_mesi_state_to_tsram(tsram, (uint16_t*)exclusive);
+	if ((BLOCK_SIZE - 1)  == *address_offset){
+		if (true == data_container_from_bus->is_bus_shared) set_mesi_state_to_tsram(tsram, (uint16_t*)shared);
+		else set_mesi_state_to_tsram(tsram, (uint16_t*)exclusive);
 		return true;
 	}
-
 	*address_offset += 1;
 	return false;
 }
-
-// state machine for snooping
-static mesi_state mesi_snooping_invalid_state(cache_information* data, data_on_bus* packet)
-{
-	return invalid;
+//setting up functions to operate that communicate with bus
+void set_cache_answer(void) {
+	set_cache_answer_function(cache_data_answer);
+}
+void set_cache_shared_func(void) {
+	set_cache_shared_function(shared_block_check);
+}
+void set_cache_snoop_function(void) {
+	set_bus_snoop_function(check_existance_of_block);
 }
 
-static mesi_state mesi_snooping_shared_state(cache_information* data, data_on_bus* packet)
-{
-	if (packet->command_on_bus == bus_read_exclusive_cmd_on_bus)
-		return invalid;
 
-	return shared;
-}
 
-static mesi_state mesi_snooping_exlusive_state(cache_information* data, data_on_bus* packet)
-{
-	if (packet->command_on_bus == bus_read_cmd_on_bus)
-		return shared;
-
-	if (packet->command_on_bus == bus_read_exclusive_cmd_on_bus)
-		return invalid;
-
-	return exclusive;
-}
-
-static mesi_state mesi_snooping_modified_state(cache_information* data, data_on_bus* packet)
-{
-	//cache_addess_s address = { .address = packet->address_on_bus };
-	uint32_t address = packet->address_on_bus;
-	//uint16_t index = address.as_bits.index * BLOCK_SIZE + address.as_bits.offset;
-	uint16_t index = (uint16_t*)(get_cache_address_index(address) * BLOCK_SIZE + get_cache_address_offset(address));
-
-	if (packet->command_on_bus == bus_read_cmd_on_bus)
-	{
-		// send back the modified data
-		packet->command_on_bus = bus_flush_cmd_on_bus;
-		packet->data_on_bus = data->dsram[index];
-		packet->origid_on_bus = data->id;
-
-		return shared;
-	}
-
-	else if (packet->command_on_bus == bus_read_exclusive_cmd_on_bus)
-	{
-		// send back the modified data
-		packet->command_on_bus = bus_flush_cmd_on_bus;
-		packet->data_on_bus = data->dsram[index];
-		packet->origid_on_bus = data->id;
-
-		return invalid;
-	}
-
-	else if (packet->command_on_bus == bus_flush_cmd_on_bus)
-	{
-		// send back the modified data
-		packet->command_on_bus = bus_flush_cmd_on_bus;
-		packet->data_on_bus = data->dsram[index];
-		packet->origid_on_bus = data->id;
-
-		return modified;
-	}
-
-	return modified;
-}

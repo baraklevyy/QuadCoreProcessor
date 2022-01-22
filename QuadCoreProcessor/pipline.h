@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "Cache.h"
 #include <stdio.h>
 #include "helper.h"
 

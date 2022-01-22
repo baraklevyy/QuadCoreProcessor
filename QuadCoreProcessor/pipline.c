@@ -1,7 +1,6 @@
 
 #include "pipline.h"
 #include <string.h>
-#include "cache.h"
 #include "helper.h"
 
 static void fetch(pipe_data* pip);
@@ -75,8 +74,12 @@ static void mem(pipe_data* ppl)
 		registers_address = ppl->opcode_params.rs + ppl->opcode_params.rt;
 		uint32_t* data_for_mem;
 		data_for_mem = ppl->opcode_params.rd;
-		if (SW == code) is_data_in_cache = Cache_WriteData(&ppl->current_data_from_cache, registers_address, *data_for_mem);
-		else is_data_in_cache = Cache_ReadData(&ppl->current_data_from_cache, registers_address, data_for_mem);
+		if (SW == code) {
+			is_data_in_cache = success_op == write_to_cache(&ppl->current_data_from_cache, registers_address, *data_for_mem) ? true : false;
+		}
+		else {
+			is_data_in_cache = success_op == read_from_cache(&ppl->current_data_from_cache, registers_address, data_for_mem) ? true : false;
+		}
 		bool add_stall = !is_data_in_cache;
 		ppl->is_mem_stall = add_stall;
 	}

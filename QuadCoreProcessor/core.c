@@ -73,10 +73,11 @@ void Core_Init(Core_s* core, uint8_t id)
 	initialize_pip(&core->pipeline);
 
 	memset(&core->pipeline.current_data_from_cache, 0, sizeof(cache_information));
-	Cache_Init(&core->pipeline.current_data_from_cache, id);
+	initialize_the_cache(&core->pipeline.current_data_from_cache, id);
 
-	//TODO: maybe move it to different location.
-	Cache_RegisterBusHandles();
+	set_cache_snoop_function();
+	set_cache_answer();
+	set_cache_shared_func();
 
 	core->pipeline.current_core_regs = core->register_array;
 	core->pipeline.pointer_to_instruction = core->instructions_memory_image;
@@ -126,7 +127,7 @@ Teardown of the code.
 void Core_Teaddown(Core_s* core)
 {
 	print_register_file(core);
-	Cache_PrintData(&core->pipeline.current_data_from_cache,
+	cache_print_to_file(&core->pipeline.current_data_from_cache,
 		core->core_files.dsram_F, core->core_files.TsRamFile);
 	print_statistics(core);
 }
@@ -235,10 +236,10 @@ static void print_statistics(Core_s* core)
 {
 	fprintf(core->core_files.StatsFile, "cycles %d\n", core->statistics.cycles + 1);
 	fprintf(core->core_files.StatsFile, "instructions %d\n", core->statistics.instructions - 1);
-	fprintf(core->core_files.StatsFile, "read_hit %d\n", core->pipeline.current_data_from_cache.statistics.read_hits);
-	fprintf(core->core_files.StatsFile, "write_hit %d\n", core->pipeline.current_data_from_cache.statistics.write_hits);
-	fprintf(core->core_files.StatsFile, "read_miss %d\n", core->pipeline.current_data_from_cache.statistics.read_misses);
-	fprintf(core->core_files.StatsFile, "write_miss %d\n", core->pipeline.current_data_from_cache.statistics.write_misses);
+	fprintf(core->core_files.StatsFile, "read_hit %d\n", core->pipeline.current_data_from_cache.number_of_read_hit);
+	fprintf(core->core_files.StatsFile, "write_hit %d\n", core->pipeline.current_data_from_cache.number_of_write_hit);
+	fprintf(core->core_files.StatsFile, "read_miss %d\n", core->pipeline.current_data_from_cache.number_of_read_miss);
+	fprintf(core->core_files.StatsFile, "write_miss %d\n", core->pipeline.current_data_from_cache.number_of_write_miss);
 	fprintf(core->core_files.StatsFile, "decode_stall %d\n", core->pipeline.current_pip_decode_stalls);
 	fprintf(core->core_files.StatsFile, "mem_stall %d\n", core->pipeline.current_pip_memory_stalls);
 }

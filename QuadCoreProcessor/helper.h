@@ -117,6 +117,21 @@ typedef struct _linked_list
 } arbitration_linked_list;
 
 
+
+typedef struct {
+	core_identifier id;
+	bool memory_stall;
+	uint32_t dsram[CACHE_SIZE];
+	uint32_t number_of_read_hit;
+	uint32_t number_of_write_hit;
+	uint32_t number_of_read_miss;
+	uint32_t number_of_write_miss;
+	uint32_t tsram[TSRAM_NUMBER_OF_LINES];
+} cache_information;
+
+
+
+
 typedef bool (*shared_function_pointer)(void* data_from_cache, data_on_bus* packet, bool* changed);
 typedef bool (*snoop_function_pointer)(void* data_from_cache, data_on_bus* packet, uint8_t address_offset);
 typedef bool (*cache_answer_function_pointer)(void* data_from_cache, data_on_bus* packet, uint8_t* address_offset);
@@ -202,7 +217,13 @@ void operate_bus(void);
 
 
 
-
+void set_cache_shared_func(void);
+void initialize_the_cache(cache_information* data, core_identifier id);
+void set_cache_answer(void);
+void set_cache_snoop_function(void);
+exit_func_code read_from_cache(cache_information* cache_data, uint32_t address, uint32_t* data);
+exit_func_code write_to_cache(cache_information* cache_data, uint32_t address, uint32_t data);
+void cache_print_to_file(cache_information* cache_data, FILE* dsram_f, FILE* tsram_f);
 
 
 
